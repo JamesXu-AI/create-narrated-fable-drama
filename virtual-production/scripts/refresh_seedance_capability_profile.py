@@ -19,18 +19,12 @@ for root in (SCRIPT_ROOT, SHARED_PROVIDER_ROOT):
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-import providers  # noqa: E402
-
-SHARED_PROVIDER_PATH = SHARED_PROVIDER_ROOT / "providers"
-if str(SHARED_PROVIDER_PATH) not in providers.__path__:
-    providers.__path__.append(str(SHARED_PROVIDER_PATH))
-
-from providers import seedance  # noqa: E402
+import seedance  # noqa: E402
 
 
 def refresh(task_dir: Path) -> dict[str, Any]:
     task_dir = task_dir.expanduser().resolve(strict=True)
-    adapter_path = REPOSITORY_ROOT / "virtual-production" / "scripts" / "providers" / "seedance.py"
+    adapter_path = REPOSITORY_ROOT / "virtual-production" / "scripts" / "seedance.py"
     if not adapter_path.is_file():
         raise RuntimeError("Current repository Seedance adapter is missing")
     model_id = seedance.model_id()
@@ -46,8 +40,14 @@ def refresh(task_dir: Path) -> dict[str, Any]:
             "maximum_reference_images": seedance.MAX_REFERENCE_IMAGES,
             "maximum_reference_videos": seedance.MAX_REFERENCE_VIDEOS,
             "maximum_reference_audios": seedance.MAX_REFERENCE_AUDIOS,
+            "recommended_total_reference_minimum": 4,
+            "recommended_total_reference_maximum": 5,
+            "recommended_independently_referenced_performers_for_simple_composition": 4,
+            "maximum_track_completion_reference_videos": 3,
+            "maximum_track_completion_source_video_seconds": 15,
             "native_audio_generation": True,
             "native_background_audio_generation": True,
+            "native_background_music_generation": True,
             "supported_reference_roles": [
                 "reference_image", "reference_audio", "reference_video"
             ],
@@ -55,26 +55,37 @@ def refresh(task_dir: Path) -> dict[str, Any]:
         "project_generation_policy": {
             "maximum_total_seconds": 240,
             "one_task_per_segment": True,
-            "seed_master_operations": [
+            "supported_operations": [
                 "text_to_video",
                 "multimodal_reference",
                 "video_extension",
-                "strict_first_frame",
-                "strict_first_last",
             ],
             "predecessor_evidence_modes": [
                 "none",
                 "approved_complete_predecessor",
-                "approved_final_2s_silent_plus_provider_last_frame",
                 "approved_provider_last_frame",
             ],
-            "matched_cut_tail_seconds": 2.0,
-            "continuity_reference_audio_policy": "preserve_for_extension_strip_for_matched_cut",
+            "prompt_timing_policy": "event_order_without_precise_provider_time_ranges",
+            "camera_policy": "one_dominant_camera_move_per_shot",
+            "extension_outgoing_trim_frames": 6,
+            "extension_incoming_trim_frames": 1,
+            "terminal_audio_fade_required": True,
+            "default_background_music_source": "seedance_native",
+            "background_music_prompt_notation": "parentheses",
+            "continuity_reference_audio_policy": "preserve_for_extension",
             "return_last_frame_required": True,
             "cross_clip_lipsync_dependency": False,
             "cross_clip_dialogue_dependency": False,
             "cross_clip_native_audio_dependency": "continuous_extension_only",
-            "maximum_inherited_video_hops": 1,
+            "maximum_direct_extension_hops_without_quality_reset": 0,
+            "extension_quality_reset_strategy": "white_model_video_edit",
+            "maximum_consecutive_predecessor_media_hops": 1,
+            "require_strong_coverage_reset_after_predecessor_media": True,
+            "strong_coverage_reset_opening_shot_sizes": [
+                "extreme_close_up",
+                "close_up",
+                "medium_close_up",
+            ],
         },
         "provider_adapter_path": adapter_path.relative_to(REPOSITORY_ROOT).as_posix(),
     }

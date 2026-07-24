@@ -872,17 +872,32 @@ def seam_signalstats(previous_video: Path, scene_video: Path) -> dict[str, Any]:
 
 def prepare(args: argparse.Namespace) -> dict[str, Any]:
     scene_video = args.scene_video.expanduser().resolve()
-    output_dir = args.output_dir.expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
     scene_meta = probe(scene_video)
     scene_audio = require_audio(scene_meta, scene_video)
-    contact_sheet = make_internal_contact_sheet(scene_video, output_dir)
-    internal_cut_sheet, internal_cut_manifest = make_internal_cut_evidence(
-        scene_video,
-        list(args.internal_cut_second or []),
-        output_dir,
+    output_dir = (
+        args.output_dir.expanduser().resolve()
+        if args.output_dir is not None
+        else None
     )
-    audio_track = extract_review_audio(scene_video, output_dir)
+    if not args.metrics_only and output_dir is None:
+        raise EvidenceError("--output-dir is required unless --metrics-only is used.")
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    contact_sheet = (
+        make_internal_contact_sheet(scene_video, output_dir)
+        if output_dir is not None
+        else None
+    )
+    internal_cut_sheet = None
+    internal_cut_manifest = None
+    audio_track = None
+    if output_dir is not None:
+        internal_cut_sheet, internal_cut_manifest = make_internal_cut_evidence(
+            scene_video,
+            list(args.internal_cut_second or []),
+            output_dir,
+        )
+        audio_track = extract_review_audio(scene_video, output_dir)
     internal_signalstats = summarize_signalstats(
         signalstats_samples(scene_video, sample_fps=INTERNAL_SAMPLE_FPS)
     )
@@ -907,24 +922,28 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             0.0,
             previous_meta["duration_seconds"] - (1.0 / previous_meta["fps"]),
         )
-        boundary_preview, boundary_transition_contract = make_boundary_preview(
-            previous_video,
-            scene_video,
-            args.previous_scene_id,
-            output_dir,
-            transition_type=args.transition_type,
-            transition_seconds=args.transition_seconds,
+        boundary_transition_contract = transition_preview_contract(
+            args.transition_type, args.transition_seconds
         )
-        boundary_pair = make_exact_seam_pair(
-            previous_video, scene_video, args.previous_scene_id, output_dir
-        )
-        boundary_manifest = extract_every_boundary_frame(
-            boundary_preview, output_dir, boundary_transition_contract
-        )
-        boundary_all_frames_sheet = make_boundary_all_frames_contact_sheet(
-            boundary_preview, output_dir
-        )
-        boundary_audio = require_audio(probe(boundary_preview), boundary_preview)
+        if output_dir is not None:
+            boundary_preview, boundary_transition_contract = make_boundary_preview(
+                previous_video,
+                scene_video,
+                args.previous_scene_id,
+                output_dir,
+                transition_type=args.transition_type,
+                transition_seconds=args.transition_seconds,
+            )
+            boundary_pair = make_exact_seam_pair(
+                previous_video, scene_video, args.previous_scene_id, output_dir
+            )
+            boundary_manifest = extract_every_boundary_frame(
+                boundary_preview, output_dir, boundary_transition_contract
+            )
+            boundary_all_frames_sheet = make_boundary_all_frames_contact_sheet(
+                boundary_preview, output_dir
+            )
+            boundary_audio = require_audio(probe(boundary_preview), boundary_preview)
         boundary_ssim = measure_seam_ssim(previous_video, scene_video)
         boundary_signalstats = seam_signalstats(previous_video, scene_video)
 
@@ -935,17 +954,23 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             "boundary_ssim": boundary_ssim,
             "boundary_ssim_role": (
                 "source-endpoint diagnostic only; never a semantic continuity gate"
-                if boundary_preview
+                if args.previous_video is not None
                 else None
             ),
             "boundary_transition_contract": boundary_transition_contract,
             "boundary_preview_each_side_seconds": BOUNDARY_SIDE_SECONDS,
             "boundary_preview_total_seconds": (
-                BOUNDARY_DURATION_SECONDS if boundary_preview else None
+                BOUNDARY_DURATION_SECONDS
+                if args.previous_video is not None
+                else None
             ),
-            "boundary_preview_fps": BOUNDARY_FPS if boundary_preview else None,
+            "boundary_preview_fps": (
+                BOUNDARY_FPS if args.previous_video is not None else None
+            ),
             "boundary_frame_count": (
-                BOUNDARY_EXPECTED_FRAME_COUNT if boundary_preview else None
+                BOUNDARY_EXPECTED_FRAME_COUNT
+                if args.previous_video is not None
+                else None
             ),
             "internal_frame_sample_interval_seconds": (
                 INTERNAL_SAMPLE_INTERVAL_SECONDS
@@ -966,7 +991,9 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             "boundary_preview": boundary_audio,
         },
         "artifacts": {
-            "internal_frame_contact_sheet": str(contact_sheet.resolve()),
+            "internal_frame_contact_sheet": (
+                str(contact_sheet.resolve()) if contact_sheet else None
+            ),
             "internal_cut_contact_sheet": (
                 str(internal_cut_sheet.resolve()) if internal_cut_sheet else None
             ),
@@ -986,7 +1013,9 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             "boundary_frame_manifest": (
                 str(boundary_manifest.resolve()) if boundary_manifest else None
             ),
-            "audio_review_track": str(audio_track.resolve()),
+            "audio_review_track": (
+                str(audio_track.resolve()) if audio_track else None
+            ),
         },
     }
 
@@ -995,7 +1024,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--scene-id", type=int, required=True)
     parser.add_argument("--scene-video", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help="Compute technical metrics without writing inspection media.",
+    )
     parser.add_argument("--previous-scene-id", type=int)
     parser.add_argument("--previous-video", type=Path)
     parser.add_argument(

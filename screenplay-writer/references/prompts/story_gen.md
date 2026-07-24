@@ -7,6 +7,12 @@ material. Preserve the source's meaning and causal design while making the story
 clear, engaging, age-appropriate, emotionally containable, and ready for later
 screenplay adaptation.
 
+This project accepts only forest-animal educational stories. The primary dramatic
+world must be a forest community of non-human animals, and the educational meaning
+must be demonstrated through their choices and consequences. Preserve a brief
+human storyteller/listener bookend only when the source already requires it.
+Reject a non-forest main story; do not convert it into a generic production.
+
 This stage writes narrative prose only. Screenplay and production decisions belong
 to later stages.
 
@@ -171,3 +177,5 @@ Before writing, silently verify:
 8. established framing returns correctly, or no new framing was invented;
 9. the prose is natural English, culturally consistent, and non-graphic;
 10. the output contains only the two required headings and the story body.
+11. the primary story is a forest-animal educational story, with any human material
+    limited to a source-required framing device.

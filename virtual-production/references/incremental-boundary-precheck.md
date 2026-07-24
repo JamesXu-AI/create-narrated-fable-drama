@@ -2,21 +2,9 @@
 
 Every newly published Seedance Segment immediately checks whether its editorial
 predecessor is already available. If both clips exist, virtual production calls the
-repository-local review evidence helper and creates:
-
-```text
-.pending/virtual-production/generation-segments/segment-NNN/boundary-precheck/
-  boundary-preview-*.mp4
-  boundary-timeline-frames.json
-  boundary-all-48-frames.jpg
-  boundary-from-scene-*.png
-  scene-review-audio.wav
-  technical-boundary-precheck.json
-```
-
-For cut-like boundaries the preview is exactly the predecessor's final 1.0 second
-plus the current Segment's opening 1.0 second. At 24 fps it contains exactly 48
-frames. Dissolves and fades are rendered using the authored transition and duration.
+repository-local review helper in `--metrics-only` mode. The helper probes the
+source videos and returns one in-memory result; it creates no screenshots, frame
+directories, preview media, manifest, or precheck record.
 
 The technical precheck may only route work:
 
@@ -27,11 +15,12 @@ The technical precheck may only route work:
 - `authored_transition_evidence_ready`: review the rendered authored effect.
 
 It never approves or rejects identity, action, performance, geometry, dialogue,
-audio, or semantic continuity. After every prepared boundary, the generation runner
-prints `BOUNDARY_REVIEW_READY`. The active task must use the repository-local
-`seedance-video-review` to watch the current Segment and strict seam with sound and
-return `NO_ISSUES` or a concise issue list. That direct result stays in the active
-task and is never persisted as an approval record.
+audio, or semantic continuity. After every checked boundary, the generation runner
+prints `BOUNDARY_REVIEW_READY`. The active task uses the repository-local
+`seedance-video-review` to watch the source clips with sound and return `NO_ISSUES`
+or a concise issue list. If inspection aids are genuinely useful, create them in a
+fresh operating-system temporary directory and delete them after review. The direct
+result stays in the active task and is never persisted as an approval record.
 
 A small finishing candidate does not block generation. A technical hold or evidence
 preparation failure stops later generation waves so the current Segment can be

@@ -12,23 +12,22 @@ import sys
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = SKILL_ROOT.parent
 for script_root in (
+    REPOSITORY_ROOT / "scripts",
     REPOSITORY_ROOT / "screenplay-writer" / "scripts",
     SKILL_ROOT / "scripts",
 ):
     if str(script_root) not in sys.path:
         sys.path.insert(0, str(script_root))
 
-from story_video.asset_catalog import load_asset_catalog  # noqa: E402
-from story_video.aesthetic_reference import load_aesthetic_reference  # noqa: E402
-from story_video.location_continuity_packages import (  # noqa: E402
-    load_location_continuity_packages,
-)
-from story_video.character_performance_map import (  # noqa: E402
+from asset_catalog import load_asset_catalog  # noqa: E402
+from aesthetic_reference import load_aesthetic_reference  # noqa: E402
+from character_performance_map import (  # noqa: E402
     load_character_performance_map,
 )
-from story_video.production_design_plan import load_production_design_plan  # noqa: E402
-from story_video.screenplay_contract import load_screenplay_file  # noqa: E402
-from story_video.validate_voice_authority import validate_voice_authority  # noqa: E402
+from production_design_plan import load_production_design_plan  # noqa: E402
+from project_domain import ProjectDomainError, validate_project_profiles  # noqa: E402
+from screenplay_contract import load_screenplay_file  # noqa: E402
+from validate_voice_authority import validate_voice_authority  # noqa: E402
 
 
 class ProductionDesignError(RuntimeError):
@@ -89,19 +88,21 @@ def _validate_silent_group_authority(
 
 def validate_task(task_dir: Path) -> dict[str, object]:
     task_dir = task_dir.expanduser().resolve(strict=True)
+    task_path = task_dir / "task.json"
+    try:
+        task = json.loads(task_path.read_text(encoding="utf-8"))
+        validate_project_profiles(task, context=str(task_path))
+    except (
+        FileNotFoundError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        ProjectDomainError,
+    ) as exc:
+        raise ProductionDesignError(str(exc)) from exc
     for relative in ("screenplay-writer/screenplay.md",):
         path = task_dir / relative
         if not path.is_file() or path.stat().st_size <= 0:
             raise ProductionDesignError(f"Missing current screenplay input: {relative}")
-    visual_spec_path = task_dir / "direct-production-design" / "visual-production-spec.md"
-    try:
-        visual_spec = visual_spec_path.read_text(encoding="utf-8")
-    except (FileNotFoundError, UnicodeDecodeError) as exc:
-        raise ProductionDesignError(
-            f"Missing or invalid visual production specification: {visual_spec_path}"
-        ) from exc
-    if "# Visual Production Specification" not in visual_spec:
-        raise ProductionDesignError("visual-production-spec.md lacks its required heading")
     catalog = load_asset_catalog(task_dir)
     performance = load_character_performance_map(task_dir)
     screenplay = load_screenplay_file(
@@ -112,20 +113,19 @@ def validate_task(task_dir: Path) -> dict[str, object]:
     )
     silent_group_count = _validate_silent_group_authority(plan, catalog)
     aesthetic_reference = load_aesthetic_reference(task_dir)
-    location_packages = load_location_continuity_packages(task_dir)
     expected_scene_ids = {
         segment["scene_id"] for segment in performance["scene_segment_calls"]
     }
-    packaged_scene_ids = {
+    planned_scene_ids = {
         scene_id
-        for location in location_packages["locations"]
+        for location in plan["locations"]
         for scene_id in location["scene_ids"]
     }
-    if packaged_scene_ids != expected_scene_ids:
+    if planned_scene_ids != expected_scene_ids:
         raise ProductionDesignError(
-            "Location continuity packages must cover every current screenplay Scene "
+            "Production-design locations must cover every current screenplay Scene "
             "exactly once; "
-            f"expected={sorted(expected_scene_ids)}, actual={sorted(packaged_scene_ids)}"
+            f"expected={sorted(expected_scene_ids)}, actual={sorted(planned_scene_ids)}"
         )
     voice_result = validate_voice_authority(task_dir)
     return {
@@ -133,8 +133,7 @@ def validate_task(task_dir: Path) -> dict[str, object]:
         "asset_count": len(catalog["assets"]),
         "silent_group_count": silent_group_count,
         "speaker_voice_count": voice_result["speaker_count"],
-        "location_package_count": len(location_packages["locations"]),
-        "location_master_count": len(location_packages["locations"]),
+        "location_master_count": len(plan["locations"]),
         "aesthetic_reference_frame_count": (
             aesthetic_reference["reference_count"]
             if aesthetic_reference is not None

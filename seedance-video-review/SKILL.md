@@ -1,6 +1,6 @@
 ---
 name: seedance-video-review
-description: Independently inspect any current production artifact or actual video, report concrete problems to the owning module, and recheck after correction. Callable by screenplay, art, cinematography, virtual production, and postproduction; use it as the transient predecessor observation gate when a Seed Master shooting plan requires observed successor recompilation. Do not create approval files, hashes, workflow records, or production artifacts.
+description: Independently inspect forest-animal production artifacts or actual video for educational causality, animal identity, forest-world continuity, picture, and sound; report concrete problems to the owning module and recheck after correction. Callable by every project department. Do not create approval files, hashes, workflow records, or production artifacts.
 ---
 
 # Seedance Video Review · 独立问题检查
@@ -16,6 +16,14 @@ project's own Skill files; never use it to perform story or media-production wor
 
 You are one independent reviewer shared by every module. Your job is simple:
 
+Read and enforce the
+[Forest Animal Education Production Standard](../references/forest-animal-education-production-standard.md).
+Also follow the
+[Human-in-the-Loop Guided Workflow](../references/human-in-the-loop-guided-workflow.md).
+Treat forest layout, landmarks, vegetation, weather, light, ambience, animal
+species, topology, relative scale, markings, population, and state as review
+authorities, not optional polish.
+
 1. inspect the current artifact or media;
 2. identify concrete problems;
 3. name the module that owns each correction;
@@ -25,6 +33,12 @@ You are one independent reviewer shared by every module. Your job is simple:
 Do not build an approval organization around review. A Seed Master serial shooting
 plan may require the direct `NO_ISSUES` result before virtual production recompiles
 its successor; keep that result in the active task only and write no approval file.
+The generation runtime may present an exact predecessor-attempt hold containing the
+predecessor video, current successor Segment, authorized performers, and resolved
+bindings. Inspect those current items directly. Only after returning `NO_ISSUES`
+may virtual production pass the hold's exact attempt as a transient command
+argument; that argument is not a review artifact and becomes invalid when the
+predecessor attempt changes.
 
 ## Who may call this Skill
 
@@ -52,6 +66,11 @@ Return directly in the current task:
 Do not write review JSON, approval records, PASS files, lock files, SHA-256 seals,
 review versions, cross-review forms, or director decisions.
 
+After reviewing a generated video, feed the compact finding and recommended next
+action directly into the after-video conversation card. `NO_ISSUES` is a technical
+review result, not permission to generate a successor or retry. Keep evidence paths,
+metrics, and internal records out of the user-facing response unless requested.
+
 If there is a problem, the owning module changes its own output. The reviewer never
 edits another module's work. After correction, inspect the corrected item directly;
 do not restart unrelated stages.
@@ -65,15 +84,53 @@ frames, representative frames, review audio, and a transition-aware two-second
 predecessor boundary. Pass the authored `--transition-type` and, for a dissolve or
 fade, its real `--transition-seconds`; never inspect a fabricated hard cut in place
 of the transition that the audience will see. Those files are temporary inspection
-aids under task `.pending`; they are not approval evidence. Virtual production may
-use an objective technical precheck to hold later generation waves until this Skill
-directly inspects a suspected large flash/exposure artifact, but metrics never
-replace the direct review result and no approval record is written.
+aids, not approval evidence. Create them only inside a fresh operating-system
+temporary directory, inspect them in the current task, and delete that directory
+immediately after review. Never place review aids under the project or task
+`.pending` tree. For automated technical routing, call the helper with
+`--metrics-only`; it writes no media or manifest. Metrics never replace the direct
+review result and no approval record is written.
 
 For a generated Segment, check story event, identity, design, location, props,
 performance, camera, light, exact speaker/dialogue, language, voice, lip sync, native
 background audio, action completion, internal cuts, safe ending, and the intended
 editorial transition.
+
+Also apply the Seedance 2.0 guide failure taxonomy directly to picture and sound:
+
+- subject identity drift, unintended twins/duplicates, or a referenced subject
+  splitting into multiple instances;
+- unwanted subtitles, stray text, logos, or watermarks;
+- style, lighting, color, anatomy, wardrobe, injury, or scene-continuity drift;
+- extension seam jumps, repeated/skipped action, repeated-extension quality loss,
+  or an unusable first/last frame;
+- a white-model quality-reset proxy that changes subject count, body structure,
+  camera, action phase, timing, spatial relationships, or duration, or a successor
+  that fails to restore approved identity, costume, texture, color, and Location
+  appearance from its high-resolution image authorities;
+- wrong speaker, missing/extraneous words, pronunciation defects, voice mismatch,
+  lip-sync drift, unintended music, audio clicks, or an abrupt audio tail; and
+- incomplete effects, overpopulated frames, random entrants, or reference overload
+  that makes required subjects unreadable.
+
+For an incoming `video_extension`, confirm the predecessor has at least six
+dialogue-free editable tail frames and the continuation has one dialogue-free head
+frame. Review the raw generated seam for diagnosis, then require final assembly to
+review the audience-facing seam after the official six-frame/one-frame trim; never
+mistake that post trim for permission to remove authored action or speech.
+
+For every incoming extension, confirm from its
+production record that the submitted temporal video is the generated white-model
+proxy with predecessor audio remuxed, never the colored predecessor. The proxy is
+private conditioning media and must not appear in the final timeline. Inspect the
+restored successor for white flashes, blank materials, lost facial/costume detail,
+wrong population, or motion/camera regression.
+
+For an incoming `strong_coverage_reset`, confirm that no predecessor frame/video
+was submitted, the opening is ECU/CU/MCU, and angle, viewpoint, composition, and
+focal emphasis have changed decisively enough to read as a real edit rather than a
+continued stage master. Do not demand pixel or camera matching across this seam;
+do demand semantic Character/Location/prop/action-result continuity.
 
 ## Semantic execution tolerance
 
@@ -162,13 +219,57 @@ reference binding failed to preserve approved authority.
 
 ## Population and offscreen-world review
 
+Before general population review, compare the actual clip with every current
+Character Segment state and its predecessor source:
+
+- inspect the actual provider request and require one asset-catalog identity or
+  approved appearance-state image binding for every provider-renderable performer
+  and NPC ensemble, including physically present offscreen and audio-only roles. Return an
+  issue before accepting the clip when any role is represented only by an internal
+  ID, Prompt prose, voice sample, predecessor frame, or predecessor video;
+- confirm every `remain_absent` role stays in the internal state/review gate and
+  has neither its internal ID nor a positive identity image in provider media;
+- for every authored internal Shot, use the live
+  `required_visible_characters_by_shot` roster as a minimum. Confirm each required
+  named/story-active individual and each required NPC ensemble field is readably
+  present. Do not audit anonymous NPC ensembles member by member and do not reject
+  exact NPC count, species-mix, or individual-identity variation. Reject only an
+  unmotivated whole-group pop-in/disappearance, duplicate crowd field, allegiance
+  swap, or omission of the required ensemble field;
+- `must_remain_visible`: the same character is readably visible in every required
+  internal Shot and at the usable outgoing state; a crop, cut, occlusion, morph, or
+  replacement may not make it disappear;
+- `must_remain_present`: a named crop or occluder may hide the character, but the
+  clip must not show or imply an exit, and the outgoing state must retain the
+  authored position, injury, and condition;
+- `enter`, `exit`, `re_enter`, `reveal`, and `conceal`: require the authored cause,
+  ordered visible transition, and declared outgoing presence; and
+- `remain_absent`: reject every body part, reflection, shadow, duplicate, or
+  background instance.
+
+Return an issue when a non-absent character vanishes without a legal transition or
+an absent character pops back in without `re_enter`. The correction begins at the
+first failing Segment. Do not accept a later reappearance as repair for an earlier
+disappearance, and do not confuse “outside this camera crop” with “left the
+Location.”
+
+If the take is otherwise accepted but a role's actual outgoing presence differs
+from the plan, do not rewrite the submitted Script or execution plan. Record a
+`seedance-reviewed-character-state-v1` manifest beside that exact generated attempt,
+including the role, planned and reviewed outgoing presence, concise reason, and an
+existing review artifact. The runtime attempt-lock validation must pass before any
+successor may consume the override.
+
 For every actual Segment, compare each readable wide or widening view with the
-Location master and its declared embedded NPC roster. Confirm that stable NPC
-types/counts/density and fixed dressing persist, while only the Segment-authorized
+Location master and its declared embedded NPC population field. Confirm that the
+NPC field does not abruptly appear, vanish, duplicate, change allegiance, or become
+story-active, while only the Segment-authorized
 independent performers act, speak, enter, exit, or receive directed gaze. Inspect
 the whole clip at normal speed and every external seam for a random new person,
-animal, silhouette, reflection, distant bystander, duplicated performer, missing
-stable NPC, or unexplained crowd-density jump.
+animal, silhouette, reflection, distant bystander, duplicated named performer, or
+an unexplained whole-crowd pop-in/disappearance. Do not report exact NPC
+types/counts/density or member-by-member identity as an issue when the ensemble
+field stays continuously established.
 
 The predecessor tail or full video proves recent action state only. A close view is
 not evidence that the offscreen population is empty, and its lack of a wide master

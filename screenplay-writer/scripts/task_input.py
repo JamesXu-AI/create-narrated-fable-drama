@@ -12,10 +12,14 @@ from typing import Any
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_SCRIPTS_DIR = REPOSITORY_ROOT / "scripts"
+for scripts_dir in (SCRIPTS_DIR, PROJECT_SCRIPTS_DIR):
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
 
-from story_video.runtime_support import (  # noqa: E402
+from project_domain import ProjectDomainError, validate_project_profiles  # noqa: E402
+from runtime_support import (  # noqa: E402
     LABEL_RE,
     StoryVideoError,
     TARGET_AGE_BANDS,
@@ -36,6 +40,8 @@ TASK_METADATA_FIELDS = {
     "translation",
     "voice_audio_source",
     "dialogue_source",
+    "story_domain_profile",
+    "visual_style_profile",
     "target_age_band",
     "created_at",
     "updated_at",
@@ -88,6 +94,10 @@ def validate_task_metadata(
         raise StoryVideoError(
             f"Task metadata is missing required story fields: {context}"
         )
+    try:
+        validate_project_profiles(payload, context=context)
+    except ProjectDomainError as exc:
+        raise StoryVideoError(str(exc)) from exc
 
     task_id = require_utf8_text(payload.get("task_id"), "task.json task_id")
     if not LABEL_RE.fullmatch(task_id):

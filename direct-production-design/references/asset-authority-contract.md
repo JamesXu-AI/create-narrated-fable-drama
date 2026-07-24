@@ -54,12 +54,13 @@ Location Prompt references fixed props and embedded NPCs, never independent
 performers. Code compares and copies the authored values; it does not classify a
 role, construct either list, or infer furniture from keywords.
 
-## URLs and evidence
+## URLs and minimal evidence
 
 Catalog URIs are stable unsigned object URLs. TOS query signatures are temporary
-transport credentials and must not enter the catalog or handoff. Prompts, provider
-requests, responses, and voice timing evidence remain beside the media, not in the
-catalog.
+transport credentials and must not enter the catalog or handoff. Keep one image
+brief beside each reusable image only because semantic reuse needs the prior Prompt.
+Do not persist duplicate image Prompt, request, or response sidecars. Keep only the
+voice request/response and timing evidence required by voice validation.
 
 ## Reuse
 

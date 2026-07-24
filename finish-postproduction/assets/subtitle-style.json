@@ -1,7 +1,7 @@
 {
   "contract": "finish-subtitle-style",
-  "text_authority": "seed_master_route_b_exact_dialogue_ledger",
-  "timing_authority": "seed_master_route_b_dialogue_duration_ledger_plus_picture_edl",
+  "text_authority": "private_seedance_segment_plan_dialogue_cues",
+  "timing_authority": "private_seedance_segment_plan_dialogue_timing_plus_picture_edl",
   "max_lines": 2,
   "max_characters_per_line_cjk": 22,
   "max_characters_per_line_latin": 42,

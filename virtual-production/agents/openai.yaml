@@ -1,4 +1,4 @@
 interface:
   display_name: "Virtual Production · 虚拟制片"
-  short_description: "Compile clean natural-language Seedance prompts"
-  default_prompt: "Use $virtual-production with Seedance Master Route B to compile storyboard.md into concise natural-language consecutive Shot N prompts. Bind the dressed Location master in every Segment, including video extension, for the complete fixed set and embedded NPC population; use predecessor media only for temporal state and separately bind every required independent performer. State one exact readable population lock. Keep all JSON, IDs, manifests, matrices, hashes, and runtime fields outside the provider prompt, then validate assets and execute the approved shooting plan."
+  short_description: "Generate consistent forest-animal Seedance segments"
+  default_prompt: "Use $virtual-production to author each Seedance Prompt directly from the bundled local contracts without any external production Skill, keep only one Prompt and one private plan per pending Segment, preserve storyboard Shot Size and continuity exactly, and pause before and after each single attempt."

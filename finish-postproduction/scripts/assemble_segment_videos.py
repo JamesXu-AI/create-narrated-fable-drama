@@ -80,20 +80,43 @@ def _render_filter(
     height: int,
     boundaries: list[dict[str, Any]],
     repair_plans: dict[str, dict[str, Any]] | None = None,
+    picture_events: list[dict[str, Any]] | None = None,
 ) -> str:
     if len(boundaries) != max(0, len(records) - 1):
         raise TimelineError("Rendered boundary coverage differs from Segment coverage")
     frame_rate = records[0].probe.frame_rate
     filters: list[str] = []
     repair_plans = repair_plans or {}
+    if picture_events is None:
+        picture_events = [
+            {
+                "segment_id": record.segment_name,
+                "source_in_seconds": 0.0,
+                "source_out_seconds": record.probe.duration_seconds,
+                "duration_seconds": record.probe.duration_seconds,
+            }
+            for record in records
+        ]
+    if [item.get("segment_id") for item in picture_events] != [
+        record.segment_name for record in records
+    ]:
+        raise TimelineError("Picture-event coverage differs from Segment coverage")
+    rendered_durations: list[float] = []
     for index, record in enumerate(records):
-        duration = record.probe.duration_seconds
+        event = picture_events[index]
+        source_in = float(event["source_in_seconds"])
+        source_out = float(event["source_out_seconds"])
+        duration = source_out - source_in
+        if source_in < 0 or source_out > record.probe.duration_seconds + 1e-3 or duration <= 0:
+            raise TimelineError(f"{record.segment_name} has an invalid EDL source window")
+        rendered_durations.append(duration)
         if not record.probe.has_audio:
             raise TimelineError(f"{record.segment_name} has no Seedance native audio")
         repair_plan = repair_plans.get(record.segment_name)
         base_video_label = f"vbase{index}" if repair_plan is not None else f"v{index}"
         filters.append(
-            f"[{index}:v:0]trim=duration={duration:.6f},setpts=PTS-STARTPTS,"
+            f"[{index}:v:0]trim=start={source_in:.6f}:end={source_out:.6f},"
+            "setpts=PTS-STARTPTS,"
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
             f"setsar=1,fps={frame_rate},format=yuv420p,settb=AVTB[{base_video_label}]"
@@ -107,6 +130,7 @@ def _render_filter(
                 plan=repair_plan,
             )
         audio_filters = [
+            f"atrim=start={source_in:.6f}:end={source_out:.6f}",
             "aresample=48000",
             "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo",
             f"apad=pad_dur={duration:.6f}",
@@ -123,11 +147,17 @@ def _render_filter(
             audio_filters.append(
                 f"afade=t=out:st={max(0.0, duration - fade):.6f}:d={fade:.6f}"
             )
+        if index == len(records) - 1:
+            terminal_fade = min(0.12, duration)
+            audio_filters.append(
+                f"afade=t=out:st={max(0.0, duration - terminal_fade):.6f}:"
+                f"d={terminal_fade:.6f}"
+            )
         filters.append(f"[{index}:a:0]{','.join(audio_filters)}[a{index}]")
 
     current_video = "v0"
     current_audio = "a0"
-    current_duration = records[0].probe.duration_seconds
+    current_duration = rendered_durations[0]
     for index, boundary in enumerate(boundaries, start=1):
         next_video = f"v{index}"
         next_audio = f"a{index}"
@@ -137,7 +167,7 @@ def _render_filter(
         overlap = float(boundary["overlap_seconds"])
         if picture_edit in {"dissolve", "fade"}:
             if overlap <= 0 or overlap >= min(
-                current_duration, records[index].probe.duration_seconds
+                current_duration, rendered_durations[index]
             ):
                 raise TimelineError(
                     f"{boundary['from']}->{boundary['to']} has invalid transition overlap"
@@ -152,7 +182,7 @@ def _render_filter(
                 f"[{current_audio}][{next_audio}]acrossfade=d={overlap:.6f}:"
                 f"c1=qsin:c2=qsin[{output_audio}]"
             )
-            current_duration += records[index].probe.duration_seconds - overlap
+            current_duration += rendered_durations[index] - overlap
         elif picture_edit in {"hard_cut", "baked_effect"}:
             if overlap != 0:
                 raise TimelineError(
@@ -164,7 +194,7 @@ def _render_filter(
             filters.append(
                 f"[{current_audio}][{next_audio}]concat=n=2:v=0:a=1[{output_audio}]"
             )
-            current_duration += records[index].probe.duration_seconds
+            current_duration += rendered_durations[index]
         else:
             raise TimelineError(f"Unsupported picture edit: {picture_edit}")
         current_video = output_video
@@ -194,6 +224,7 @@ def render_picture_lock(
                 height,
                 picture_edl["boundaries"],
                 repair_plans,
+                picture_events=picture_edl["picture_events"],
             ),
             "-map",
             "[vout]",

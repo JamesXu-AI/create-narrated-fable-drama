@@ -7,7 +7,8 @@ The default and only main-flow audio layer is:
 ```text
 Seedance native-sync = synchronized dialogue + breaths + reactions + room tone
                        + ambience + foley + effects + diegetic sound
-background_music_source = none
+                       + background music
+background_music_source = seedance_native
 ```
 
 Every Seedance Segment must contain a real native audio stream generated with
@@ -16,10 +17,10 @@ Every Seedance Segment must contain a real native audio stream generated with
 actual synchronized words. Never replace that stream, shift it away from picture,
 or use the identity-reference WAV as delivered dialogue.
 
-Seedance must not generate non-diegetic background music. Both the current Segment
-Script and submitted provider Prompt must explicitly declare `No background music`.
-`seedance_background_music: false` is accepted in the Segment Script, but the
-submitted Prompt must still contain the textual prohibition.
+Seedance generates the main-flow background music inside its synchronized native
+track. Both the current Segment Script and submitted provider Prompt describe that
+music with official `(music cue)` notation. Postproduction never separates,
+recomposes, or replaces it.
 
 ## Timeline behavior
 
@@ -27,15 +28,19 @@ submitted Prompt must still contain the textual prohibition.
 `native-sync` track with one sample-aligned event per Segment. It declares:
 
 ```text
-music_provider: none
-seedance_background_music: false
-background_music_source: none
+music_provider: seedance
+seedance_background_music: true
+background_music_source: seedance_native
 ```
 
-Do not pre-create a SeedAudio track, score policy, or score anchors in this main-flow
-artifact. Motivated cuts use a synchronized edge de-click. Authored dissolve/fade
+Do not pre-create a separate SeedAudio track, score policy, or score anchors in this
+main-flow artifact. Motivated cuts use a synchronized edge de-click. Authored dissolve/fade
 boundaries may overlap picture and native audio by the exact authored duration.
 Native dialogue, effects, and ambience never move across a Segment boundary.
+At an incoming `video_extension`, picture and native audio share the same official
+six-tail-frame/one-head-frame source trim after dialogue-free handles are verified.
+The final native event receives a short terminal fade to prevent an audio click;
+that fade never moves or replaces dialogue.
 
 ## Delivery
 
@@ -44,9 +49,9 @@ The final delivery manifest declares:
 ```text
 voice_audio_source: speaker_reference_audio
 dialogue_source: seedance
-native_background_audio_source: seedance_ambience_and_foley_no_music
-seedance_background_music: false
-background_music_source: none
+native_background_audio_source: seedance_ambience_foley_and_music
+seedance_background_music: true
+background_music_source: seedance_native
 ```
 
 SeedAudio scripts and prior experimental artifacts may remain under `.pending`, but

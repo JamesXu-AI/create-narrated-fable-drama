@@ -7,7 +7,6 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 from pathlib import Path
-from pkgutil import extend_path
 import sys
 from typing import Any
 
@@ -20,41 +19,32 @@ for script_root in (
     if str(script_root) not in sys.path:
         sys.path.insert(0, str(script_root))
 
-import story_video  # noqa: E402
-
-story_video.__path__ = extend_path(story_video.__path__, story_video.__name__)
-
-from story_video.aesthetic_reference import load_aesthetic_reference  # noqa: E402
-from story_video.asset_briefing import (  # noqa: E402
+from aesthetic_reference import load_aesthetic_reference  # noqa: E402
+from asset_briefing import (  # noqa: E402
     brief_file_matches,
     reusable_visual_candidate_from_current_record,
     reusable_visual_from_current_record,
 )
-from story_video.asset_catalog import (  # noqa: E402
+from asset_catalog import (  # noqa: E402
     ASSET_CATALOG_RELATIVE_PATH,
     ASSET_MEDIA_RELATIVE_PATH,
-    reject_task_local_asset_state,
 )
-from story_video.character_performance_map import (  # noqa: E402
+from character_performance_map import (  # noqa: E402
     load_character_performance_map,
     role_asset_scope_gate,
 )
-from story_video.location_continuity_packages import (  # noqa: E402
-    PACKAGE_CONTRACT,
-    PACKAGE_RELATIVE_PATH,
-)
-from story_video.production_design_plan import (  # noqa: E402
+from production_design_plan import (  # noqa: E402
     PLAN_RELATIVE_PATH,
     load_production_design_plan,
     render_generation_prompt,
 )
-from story_video.screenplay_contract import load_screenplay_file  # noqa: E402
-from story_video.visual_asset_generation import (  # noqa: E402
+from screenplay_contract import load_screenplay_file  # noqa: E402
+from visual_asset_generation import (  # noqa: E402
     DEFAULT_IMAGE_SIZE,
     DEFAULT_TIMEOUT,
     generate_visual_asset,
 )
-from story_video.voice_reference_generation import (  # noqa: E402
+from voice_reference_generation import (  # noqa: E402
     ensure_voice_references,
 )
 
@@ -443,32 +433,6 @@ def _final_catalog(
     }
 
 
-def _final_location_packages(plan: dict[str, Any]) -> dict[str, Any]:
-    """Serialize only exact model-authored location fields into the task package."""
-
-    return {
-        "contract": PACKAGE_CONTRACT,
-        "path_resolution": "task_root_relative",
-        "locations": [
-            {
-                "location_id": location["location_id"],
-                "scene_ids": location["scene_ids"],
-                "embedded_npc_asset_ids": location["embedded_npc_asset_ids"],
-                "independent_performer_asset_ids": location[
-                    "independent_performer_asset_ids"
-                ],
-                "fixed_set_elements_en": location["fixed_set_elements_en"],
-                "environment_state_en": location["environment_state_en"],
-                "lighting_state_en": location["lighting_state_en"],
-                "palette_materials_en": location["palette_materials_en"],
-                "topology": location["topology"],
-                "landmarks": location["landmarks"],
-            }
-            for location in plan["locations"]
-        ],
-    }
-
-
 def build_task(
     task_dir: Path,
     *,
@@ -481,7 +445,6 @@ def build_task(
     inspect_semantic_reuse: bool = False,
 ) -> dict[str, Any]:
     root = task_dir.expanduser().resolve(strict=True)
-    reject_task_local_asset_state(root)
     if not 1 <= max_workers <= 8:
         raise InitialProductionDesignError("max_workers must be 1-8")
     role_scope = role_asset_scope_gate(root)
@@ -561,7 +524,6 @@ def build_task(
         plan, visuals=visuals, voice_references=voice_references
     )
     _write_json(REPOSITORY_ROOT / ASSET_CATALOG_RELATIVE_PATH, catalog)
-    _write_json(root / PACKAGE_RELATIVE_PATH, _final_location_packages(plan))
     return {
         "status": "PASS",
         "role_asset_scope_gate": role_scope["status"],

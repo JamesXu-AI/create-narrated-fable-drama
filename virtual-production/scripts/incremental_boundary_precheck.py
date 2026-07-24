@@ -44,16 +44,6 @@ def _read_json(path: Path, *, label: str) -> dict[str, Any]:
     return value
 
 
-def _write_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(path)
-
-
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -273,7 +263,7 @@ def boundary_contract(
     if incoming_index == 0:
         return None
     transitions = _story_transition_designs(task_dir)
-    if len(transitions) != len(ordered_segment_ids):
+    if len(transitions) < len(ordered_segment_ids):
         raise IncrementalBoundaryPrecheckError(
             "Screenplay transition coverage differs from Segment order"
         )
@@ -359,43 +349,6 @@ def classify_technical_precheck(
     )
 
 
-def _cached_precheck(
-    record_path: Path,
-    *,
-    predecessor_attempt_id: str,
-    current_attempt_id: str,
-    config_sha256: str,
-) -> dict[str, Any] | None:
-    if not record_path.is_file():
-        return None
-    record = _read_json(record_path, label="incremental boundary technical precheck")
-    identity = record.get("source_identity")
-    evidence = record.get("review_evidence")
-    artifacts = evidence.get("artifacts") if isinstance(evidence, dict) else None
-    required_artifacts = (
-        artifacts.get("boundary_preview") if isinstance(artifacts, dict) else None,
-        artifacts.get("boundary_frame_manifest") if isinstance(artifacts, dict) else None,
-        artifacts.get("boundary_all_frames_contact_sheet")
-        if isinstance(artifacts, dict)
-        else None,
-    )
-    if (
-        record.get("contract")
-        != "virtual-production-incremental-boundary-precheck/v1"
-        or not isinstance(identity, dict)
-        or identity.get("predecessor_provider_attempt_id")
-        != predecessor_attempt_id
-        or identity.get("current_provider_attempt_id") != current_attempt_id
-        or identity.get("config_sha256") != config_sha256
-        or not all(
-            isinstance(path, str) and Path(path).is_file()
-            for path in required_artifacts
-        )
-    ):
-        return None
-    return record
-
-
 def prepare_incremental_boundary_precheck(
     task_dir: Path,
     incoming_segment_id: str,
@@ -439,18 +392,7 @@ def prepare_incremental_boundary_precheck(
             "technical_status": "disabled",
             "blocks_downstream": False,
         }
-    output_dir = _segment_dir(task_dir, incoming_segment_id) / "boundary-precheck"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    record_path = output_dir / "technical-boundary-precheck.json"
     config_sha256 = _sha256(config_path)
-    cached = _cached_precheck(
-        record_path,
-        predecessor_attempt_id=predecessor["provider_attempt_id"],
-        current_attempt_id=current["provider_attempt_id"],
-        config_sha256=config_sha256,
-    )
-    if cached is not None:
-        return cached
     if not EVIDENCE_HELPER.is_file():
         raise IncrementalBoundaryPrecheckError(
             f"Missing repository-local review evidence helper: {EVIDENCE_HELPER}"
@@ -462,8 +404,7 @@ def prepare_incremental_boundary_precheck(
         str(contract["incoming_segment_number"]),
         "--scene-video",
         str(current["video"]),
-        "--output-dir",
-        str(output_dir),
+        "--metrics-only",
         "--previous-scene-id",
         str(contract["outgoing_segment_number"]),
         "--previous-video",
@@ -513,6 +454,7 @@ def prepare_incremental_boundary_precheck(
             "config_sha256": config_sha256,
         },
         "review_evidence": evidence,
+        "evidence_storage": "in_memory_only",
         "technical_status": status,
         "technical_reason": reason,
         "blocks_downstream": blocks,
@@ -526,9 +468,7 @@ def prepare_incremental_boundary_precheck(
                 "return NO_ISSUES or a concrete issue list before regeneration routing."
             ),
         },
-        "record_path": str(record_path.resolve()),
     }
-    _write_json(record_path, record)
     return record
 
 

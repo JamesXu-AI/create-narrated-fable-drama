@@ -22,9 +22,10 @@ score must recognize the production's visual world, follow screenplay turns, sta
 out of the way of dialogue and native effects, and feel continuous across separately
 generated Seedance Segments.
 
-Do not ask Seedance to make this score. Seedance owns synchronized native sound and
-must explicitly make no background music. SeedAudio owns the separate music stem in
-postproduction.
+This experiment intentionally differs from the default main flow, where Seedance
+owns both synchronized native sound and background music. For the experiment only,
+regenerate a separate music-free Seedance source set; SeedAudio then owns the
+separate music stem in postproduction.
 
 ## Entry gate
 
@@ -33,8 +34,8 @@ Before any SeedAudio provider call, require all of the following:
 1. every current generated Segment, production record, and native audio stream is
    present and bound to current authority;
 2. every current Segment Script forbids Seedance background music;
-3. every persisted submitted `seedance-request.json` Prompt contains `No background
-   music` or an accepted equivalent;
+3. every compact Segment production record's `submitted_prompt` contains `No
+   background music` or an accepted equivalent;
 4. no Segment Script, provider artifact, or persisted media analysis says that
    Seedance music is baked into the native track;
 5. the picture/audio EDL and audio timeline cover the complete picture lock;
@@ -43,6 +44,8 @@ Before any SeedAudio provider call, require all of the following:
 
 Treat a failed gate as upstream regeneration work. Do not attempt vocal/music source
 separation, spectral masking, or another score on top of baked music.
+The accepted default main-flow Segments fail this gate by design and must never be
+silently reused for the experiment.
 
 ## Authoring the theme
 
@@ -176,21 +179,9 @@ TASK_DIR/.pending/finish-postproduction/music-production/
   score-manifest.json
 ```
 
-For an explicitly requested background-music-only audition of a legacy master whose
-old audio cannot be cleanly separated, remove the complete old audio stream and run:
-
-```text
-python3 finish-postproduction/scripts/evaluate_seedaudio_score_only.py \
-  --video LEGACY_MASTER \
-  --music-plan MUSIC_PLAN \
-  --anchors SCORE_ANCHORS \
-  --segment-scripts SEGMENT_SCRIPTS \
-  --output-dir EVALUATION_OUTPUT
-```
-
-This diagnostic output contains no dialogue, native effects, ambience, or old music.
-Never treat it as a final mix. Retry only transient network, HTTP 500, or audio-risk
-audit failures, at most three provider attempts. If the user accepts a diagnostic
-fallback after exhausted audio-risk review, reuse a different window from prior
-approved same-theme material, mark the Cue `fallback_edit`, and disclose it in the
-evaluation manifest.
+Never treat a diagnostic score-only output as a final mix. Do not automatically retry a network, HTTP 500,
+audio-risk, or any other provider failure. Explain the failure and wait for fresh
+human confirmation before another attempt. If the user accepts a diagnostic
+fallback after audio-risk review, reuse a different window from prior approved
+same-theme material, mark the Cue `fallback_edit`, and disclose it in the evaluation
+manifest.

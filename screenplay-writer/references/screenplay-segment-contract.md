@@ -69,7 +69,18 @@ Entity ID | Character | Story Role | Narrative Function | Kind | Recurring | Gro
 `anonymous_ensemble`. `Recurring` is `yes` or `no`. `Narration` is `allowed`,
 `conditional`, or `not_allowed`. Dialogue owners use `none` for Group Role and
 Member Types. A silent ensemble uses one concrete Group Role and a
-semicolon-separated exact member-type list.
+semicolon-separated intended member-type list. This list is a writing/design
+description, not a downstream frame-exact NPC audit. The screenplay tracks an
+`anonymous_ensemble` as one group-presence field: its authored arrival, persistence,
+visibility minimum, allegiance, and exit remain authoritative, while exact generated
+NPC member counts, species mix, and member-by-member identity do not.
+Entity IDs and Group Role labels are project trace keys only. They never act as
+model-facing identity evidence. Downstream Storyboard/Prompt compilation must
+resolve every provider-renderable individual or ensemble—including physically
+present offscreen and audio-only roles—to an actual identity or approved
+appearance-state reference image. A `must_remain_absent` entity stays in the
+internal state/review chain and must not be sent to the provider as an ID or
+positive image.
 
 ## Script
 
@@ -79,7 +90,7 @@ After `## Script`, write consecutive units:
 ## Scene Unit 1 — <dramatic label>
 ```
 
-A Scene Unit is a 4–15 second screenplay planning unit. Route A may pack or refine
+A Scene Unit is a 4–15 second screenplay planning unit. Cinematography may pack or refine
 it for generation, and its Shot rows do not prescribe the number or formatting of
 future Seedance Prompt passages. Several adjacent units may share one `Scene ID`;
 a new unit does not imply a change of scene, place, or time.
@@ -134,7 +145,24 @@ establishing | wide | medium | close_up | extreme_close_up | insert | reaction |
 Choose the scale or viewpoint only when it serves spatial understanding, action,
 reaction, revelation, concealment, emotional emphasis, or educational legibility.
 Do not write lens, focal length, camera height, coordinates, equipment, lighting,
-routine camera movement, or edit implementation. Seedance Master owns those.
+routine camera movement, or edit implementation. The repository-local
+cinematography and virtual-production departments own those.
+
+The default grammar is attention-led and intimate:
+
+- `close_up`, `extreme_close_up`, `reaction`, `insert`, and `pov` isolate the face,
+  eye line, breath, wound, active body part, clue, or educational detail that owns
+  the beat;
+- `medium` supports readable shared action or dialogue after geography is known;
+- `establishing` and `wide` are exceptional spatial tools for newly required
+  geography, scale, full-body mechanics, entrances/exits, or changed relationships.
+
+Do not use `establishing` or `wide` as an automatic Scene opener, continuity proof,
+or frontal all-cast dialogue master. Do not author three consecutive
+`establishing`/`wide` rows. Every Scene with three or more Shot rows contains at
+least one `close_up`, `extreme_close_up`, `reaction`, `insert`, or `pov` row.
+This deterministic floor prevents stage-tableau coverage; it is not a maximum on
+tight Shots and not a requirement to cut mechanically.
 
 #### Performers, action, reaction, and movement
 
@@ -261,6 +289,46 @@ Scene ID | Segment IDs | Primary Time | Primary Place | Narrative Event | Entry 
 Scene ID | Purpose | Character Objective | Obstacle | Power Relationship | Turning Point | Outcome | Spatial Progression | Exit Impulse
 ```
 
+### Character Scene States
+
+```text
+Scene ID | Segment ID | Entity ID | State Source Segment | Incoming Diegetic Presence | Visibility Requirement | Required Visible Shots | Position, Injury and Condition | Transition Cause | Outgoing Diegetic Presence
+```
+
+This table is the upstream character lifecycle authority. It separates whether a
+character still exists in the physical Scene from whether the current camera must
+show that character.
+
+`Incoming Diegetic Presence` and `Outgoing Diegetic Presence` are
+`present_in_location` or `absent_from_location`. `Visibility Requirement` is one
+of:
+
+```text
+visible_every_shot | visible_in_required_shots | may_be_offscreen | must_remain_absent
+```
+
+`Required Visible Shots` is an ordered comma-separated list of exact authored
+Shot IDs, or `none`. `visible_every_shot` names every Shot in the Scene Unit;
+`visible_in_required_shots` names at least one. `may_be_offscreen` is not an exit
+and uses `none`; the Character Staging row remains present with an off-screen
+declaration. `must_remain_absent` uses absent incoming/outgoing presence and
+`none`.
+
+`visible_every_shot` is reserved for events whose causal legibility depends on
+continuous simultaneous visibility. It is not the default for every role that is
+physically present. Shot/reverse-shot, close-up, reaction, insert, and POV coverage
+normally uses `may_be_offscreen` for the cropped but still-present roles. Do not
+convert presence continuity into a reason for a wide all-cast composition.
+
+Every performer, speaker, silent story-active individual, and closed ensemble that
+is physically present has a row. A character with outgoing
+`present_in_location` must have a state row in the next Scene Unit of the same
+Scene even when outside the crop. Its `State Source Segment` is the latest prior
+row and its incoming presence equals that source's outgoing presence. A new camera,
+close-up, generation limit, reference budget, or stability preference is never an
+exit. Only the screenplay or an explicit user revision may relax a required
+visibility row.
+
 ### Continuity States
 
 ```text
@@ -276,8 +344,13 @@ parent and records only changed story facts and their cause.
 Boundary ID | From Segment | To Segment | From State | To State | Handoff | Transition | Dramatic Reason | Audio Handoff | Continuity Handoff
 ```
 
-`Handoff` is `independent`, `state_match`, or `continuous_motion`. Same-Scene units
-are serial. Use `state_match` after a settled motivated cut; use
-`continuous_motion` when unfinished action, entry, movement, facing, eyeline, or
-performance crosses the unit boundary. A Scene/time/place discontinuity may use
-`independent`.
+`Handoff` is `independent`, `state_match`, `continuous_motion`, or
+`strong_coverage_reset`. Same-Scene units are serial. Use `state_match` after one
+settled motivated predecessor-media cut; use `continuous_motion` when unfinished
+action, entry, movement, facing, eyeline, or performance crosses one boundary.
+After either inherited handoff, the immediately following same-Scene boundary must
+use `strong_coverage_reset`: the predecessor is settled, the successor preserves
+semantic state but opens with an ECU/CU/MCU from a decisively new angle, viewpoint,
+and composition and does not request predecessor media. If action is unfinished,
+repack the units rather than forcing the cut. A Scene/time/place discontinuity may
+use `independent`.

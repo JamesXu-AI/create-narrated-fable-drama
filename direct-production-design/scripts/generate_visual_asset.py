@@ -14,7 +14,7 @@ REPOSITORY_ROOT = SCRIPT_ROOT.parents[1]
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
-from story_video.visual_asset_generation import (  # noqa: E402
+from visual_asset_generation import (  # noqa: E402
     ASSET_KINDS,
     DEFAULT_IMAGE_SIZE,
     DEFAULT_TIMEOUT,

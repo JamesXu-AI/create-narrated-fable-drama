@@ -14,7 +14,7 @@ SCRIPTS_ROOT = REPOSITORY_ROOT / "screenplay-writer" / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from story_video.character_performance_map import role_asset_scope_gate  # noqa: E402
+from character_performance_map import role_asset_scope_gate  # noqa: E402
 
 
 def main() -> int:

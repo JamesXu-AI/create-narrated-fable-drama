@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from pkgutil import extend_path
 import re
 import subprocess
 import sys
@@ -16,29 +15,33 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 STORYBOARD_SCRIPT_ROOT = REPOSITORY_ROOT / "virtual-production" / "scripts"
 SCREENPLAY_SCRIPT_ROOT = REPOSITORY_ROOT / "screenplay-writer" / "scripts"
-for script_root in (STORYBOARD_SCRIPT_ROOT, SCREENPLAY_SCRIPT_ROOT):
+PROJECT_SCRIPT_ROOT = REPOSITORY_ROOT / "scripts"
+for script_root in (
+    STORYBOARD_SCRIPT_ROOT,
+    SCREENPLAY_SCRIPT_ROOT,
+    PROJECT_SCRIPT_ROOT,
+):
     if str(script_root) not in sys.path:
         sys.path.insert(0, str(script_root))
-if "story_video" in sys.modules:
-    sys.modules["story_video"].__path__ = extend_path(  # type: ignore[attr-defined]
-        sys.modules["story_video"].__path__,  # type: ignore[attr-defined]
-        "story_video",
-    )
 
-from route_b_handoff import load_route_b_handoff  # noqa: E402
-from story_video.seed_master_runtime import (  # noqa: E402
+from segment_handoff import load_segment_handoff  # noqa: E402
+from segment_runtime import (  # noqa: E402
     load_execution_plan,
     parse_segment_script,
-    sha256_file,
+    sha256_json,
     storyboard_segment_rows,
 )
-from story_video.boundary_execution import (  # noqa: E402
+from boundary_execution import (  # noqa: E402
     build_story_plan_boundaries,
 )
-from story_video.screenplay_contract import load_screenplay_file  # noqa: E402
+from project_domain import ProjectDomainError, validate_project_profiles  # noqa: E402
+from screenplay_contract import load_screenplay_file  # noqa: E402
 
 SEGMENT_RE = re.compile(r"^segment-([0-9]{3})$")
 MAX_FINAL_RUNTIME_SECONDS = 240.0
+SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES = 6
+SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES = 1
+TERMINAL_AUDIO_FADE_SECONDS = 0.12
 
 
 class TimelineError(RuntimeError):
@@ -148,6 +151,10 @@ def _screenplay_story_plans(
 
 def _validate_task_audio(task_dir: Path) -> dict[str, Any]:
     task = _load_json(task_dir / "task.json", label="task")
+    try:
+        validate_project_profiles(task, context=str(task_dir / "task.json"))
+    except ProjectDomainError as exc:
+        raise TimelineError(str(exc)) from exc
     if task.get("voice_audio_source") != "speaker_reference_audio":
         raise TimelineError(
             "task.json voice_audio_source must be speaker_reference_audio"
@@ -166,19 +173,6 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
         raise TimelineError(
             "screenplay.md Segment order differs from the current private Segment plans"
         )
-    generation_state = _load_json(
-        task_dir / "virtual-production" / "generation-state.json",
-        label="generation state",
-    )
-    state_segments = generation_state.get("segments")
-    if (
-        generation_state.get("contract") != "virtual-production-generation-state"
-        or generation_state.get("state") != "GENERATED"
-        or not isinstance(state_segments, list)
-        or [item.get("segment_id") for item in state_segments if isinstance(item, dict)]
-        != expected
-    ):
-        raise TimelineError("Virtual production has not completed every current Segment")
     virtual_pending = task_dir / ".pending" / "virtual-production"
     media_root = virtual_pending / "generation-segments"
     scripts_root = virtual_pending / "seedance-segment-scripts"
@@ -207,38 +201,20 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
             or production_record.get("status") != "GENERATED"
         ):
             raise TimelineError(f"{segment_name} is not a completed generated Segment")
-        generated_script = media_root / segment_name / "segment-script.md"
-        if (
-            not generated_script.is_file()
-            or generated_script.read_text(encoding="utf-8")
-            != script.read_text(encoding="utf-8")
-        ):
-            raise TimelineError(
-                f"{segment_name} video was generated from a stale Segment Script"
-            )
-        submission = _load_json(
-            media_root / segment_name / "seedance-submission.json",
-            label=f"{segment_name} Seedance submission",
-        )
-        attempt_number = submission.get("attempt_number")
+        attempt_number = production_record.get("attempt_number")
         if isinstance(attempt_number, bool) or not isinstance(attempt_number, int) or attempt_number < 1:
             raise TimelineError(f"{segment_name} has invalid provider attempt identity")
         provider_attempt_id = f"{segment_name}__attempt-{attempt_number:04d}"
         recorded_attempt = production_record.get("provider_attempt_id")
-        if recorded_attempt not in {None, provider_attempt_id}:
+        if recorded_attempt != provider_attempt_id:
             raise TimelineError(f"{segment_name} production attempt identity is stale")
         parsed_script = parse_segment_script(script)
-        execution_plan_path = (
-            virtual_pending
-            / "seedance-execution-plans"
-            / f"{segment_name}.json"
-        )
         execution_plan = load_execution_plan(task_dir, segment_name)
         if (
-            production_record.get("seed_master_script_sha256")
+            production_record.get("segment_prompt_sha256")
             != parsed_script["script_sha256"]
             or production_record.get("seedance_execution_plan_sha256")
-            != sha256_file(execution_plan_path)
+            != sha256_json(execution_plan)
             or production_record.get("operation")
             != parsed_script["metadata"]["operation"]
         ):
@@ -266,6 +242,87 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
     return records
 
 
+def _dialogue_cues(handoff: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        cue
+        for block in handoff.get("timeline_blocks", [])
+        if isinstance(block, dict)
+        for cue in block.get("dialogue_cues", [])
+        if isinstance(cue, dict)
+    ]
+
+
+def _source_windows(
+    records: list[SegmentRecord],
+    handoffs: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, float]], dict[tuple[str, str], dict[str, Any]]]:
+    """Plan the official 6-frame/1-frame Seedance extension seam cleanup."""
+
+    windows = [
+        {"source_in_seconds": 0.0, "source_out_seconds": record.probe.duration_seconds}
+        for record in records
+    ]
+    seam_trims: dict[tuple[str, str], dict[str, Any]] = {}
+    for index in range(1, len(records)):
+        incoming = records[index]
+        if incoming.fields.get("operation") != "video_extension":
+            continue
+        outgoing = records[index - 1]
+        outgoing_fps = _fraction_as_float(outgoing.probe.frame_rate)
+        incoming_fps = _fraction_as_float(incoming.probe.frame_rate)
+        outgoing_trim = SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES / outgoing_fps
+        incoming_trim = SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES / incoming_fps
+        outgoing_handoff = handoffs.get(outgoing.segment_name)
+        incoming_handoff = handoffs.get(incoming.segment_name)
+        if not isinstance(outgoing_handoff, dict) or not isinstance(incoming_handoff, dict):
+            raise TimelineError(
+                f"Missing Segment handoff for extension seam "
+                f"{outgoing.segment_name}->{incoming.segment_name}"
+            )
+        safe = outgoing_handoff.get("segment_safe_cut_design")
+        available_hold = (
+            float(safe.get("editable_hold_seconds", -1))
+            if isinstance(safe, dict)
+            else -1.0
+        )
+        if available_hold + 1e-6 < outgoing_trim:
+            raise TimelineError(
+                f"{outgoing.segment_name} provides {available_hold:.3f}s editable hold, "
+                f"but its Seedance extension seam needs {outgoing_trim:.3f}s for six frames"
+            )
+        outgoing_cut = windows[index - 1]["source_out_seconds"] - outgoing_trim
+        incoming_cut = windows[index]["source_in_seconds"] + incoming_trim
+        if outgoing_cut <= windows[index - 1]["source_in_seconds"] or incoming_cut >= windows[index]["source_out_seconds"]:
+            raise TimelineError(
+                f"Seedance extension seam trim would consume a complete Segment at "
+                f"{outgoing.segment_name}->{incoming.segment_name}"
+            )
+        outgoing_dialogue = _dialogue_cues(outgoing_handoff)
+        incoming_dialogue = _dialogue_cues(incoming_handoff)
+        if any(float(cue["end_seconds"]) > outgoing_cut + 1e-6 for cue in outgoing_dialogue):
+            raise TimelineError(
+                f"{outgoing.segment_name} dialogue overlaps the required six-frame extension trim"
+            )
+        if any(float(cue["start_seconds"]) < incoming_cut - 1e-6 for cue in incoming_dialogue):
+            raise TimelineError(
+                f"{incoming.segment_name} dialogue overlaps the required one-frame extension trim"
+            )
+        windows[index - 1]["source_out_seconds"] = outgoing_cut
+        windows[index]["source_in_seconds"] = incoming_cut
+        seam_trims[(outgoing.segment_name, incoming.segment_name)] = {
+            "policy": "seedance_extension_6_tail_frames_1_head_frame",
+            "outgoing_trim_frames": SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES,
+            "incoming_trim_frames": SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES,
+            "outgoing_trim_seconds": round(outgoing_trim, 6),
+            "incoming_trim_seconds": round(incoming_trim, 6),
+            "outgoing_source_out_seconds": round(outgoing_cut, 6),
+            "incoming_source_in_seconds": round(incoming_cut, 6),
+            "dialogue_clear": True,
+            "editable_hold_verified": True,
+        }
+    return windows, seam_trims
+
+
 def compile_timelines(
     task_dir: Path,
     records: list[SegmentRecord] | None = None,
@@ -283,10 +340,13 @@ def compile_timelines(
     plan_boundaries = build_story_plan_boundaries(
         story_plans, authored_boundaries
     )
-    storyboards = load_route_b_handoff(task_dir)
+    storyboards = load_segment_handoff(task_dir)
+    source_windows, seam_trims = _source_windows(records, storyboards)
     cursor = 0.0
     for index, record in enumerate(records):
-        duration = record.probe.duration_seconds
+        source_in = source_windows[index]["source_in_seconds"]
+        source_out = source_windows[index]["source_out_seconds"]
+        duration = source_out - source_in
         incoming_execution = (
             plan_boundaries[index - 1]["execution"] if index else None
         )
@@ -305,8 +365,8 @@ def compile_timelines(
         common = {
             "segment_id": record.segment_name,
             "source": str(record.video_path),
-            "source_in_seconds": 0.0,
-            "source_out_seconds": round(duration, 6),
+            "source_in_seconds": round(source_in, 6),
+            "source_out_seconds": round(source_out, 6),
             "timeline_in_seconds": round(start, 6),
             "timeline_out_seconds": round(end, 6),
             "duration_seconds": round(duration, 6),
@@ -326,17 +386,20 @@ def compile_timelines(
             {
                 **common,
                 "event_id": f"native-{record.segment_name}",
-                "purpose": "seedance_native_dialogue_foley_and_ambience_without_background_music",
+                "purpose": "seedance_native_dialogue_foley_ambience_and_background_music",
                 "has_source_audio": True,
                 "voice_audio_source": "speaker_reference_audio",
                 "dialogue_source": "seedance",
                 "native_ambience_source": "seedance",
-                "background_music_source": "none",
-                "seedance_background_music": False,
+                "background_music_source": "seedance_native",
+                "seedance_background_music": True,
                 "preserve_lip_sync": True,
                 "cross_boundary_copy_allowed": False,
                 "transition_overlap_allowed": incoming_overlap > 0,
                 "gain_db": 0.0,
+                "terminal_audio_fade_seconds": (
+                    TERMINAL_AUDIO_FADE_SECONDS if index == len(records) - 1 else 0.0
+                ),
             }
         )
         if index + 1 < len(records):
@@ -352,7 +415,7 @@ def compile_timelines(
                     storyboard = storyboards[record.segment_name]
                 except KeyError as exc:
                     raise TimelineError(
-                        f"{record.segment_name} is absent from the Route B handoff"
+                        f"{record.segment_name} is absent from the Segment handoff"
                     ) from exc
                 safe = storyboard.get("segment_safe_cut_design")
                 available = (
@@ -366,8 +429,7 @@ def compile_timelines(
                         f"handle but {execution['authored_transition_type']} requires "
                         f"{overlap:.3f}s"
                     )
-            boundaries.append(
-                {
+            boundary = {
                     "from": record.segment_name,
                     "to": records[index + 1].segment_name,
                     "authored_transition_type": execution[
@@ -384,7 +446,18 @@ def compile_timelines(
                     ],
                     "overlap_seconds": round(overlap, 6),
                 }
+            seam_trim = seam_trims.get(
+                (record.segment_name, records[index + 1].segment_name)
             )
+            if seam_trim is not None:
+                boundary["seedance_extension_trim"] = seam_trim
+                boundary["outgoing_source_out_seconds"] = seam_trim[
+                    "outgoing_source_out_seconds"
+                ]
+                boundary["incoming_source_in_seconds"] = seam_trim[
+                    "incoming_source_in_seconds"
+                ]
+            boundaries.append(boundary)
         cursor = end
     if cursor > runtime_limit_seconds + 1e-6:
         raise TimelineError(
@@ -397,6 +470,12 @@ def compile_timelines(
         "duration_seconds": round(cursor, 6),
         "picture_events": picture_events,
         "boundaries": boundaries,
+        "seedance_extension_trim_policy": {
+            "enabled": True,
+            "outgoing_tail_frames": SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES,
+            "incoming_head_frames": SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES,
+            "applied_boundary_count": len(seam_trims),
+        },
     }
     audio_timeline = {
         "contract": "finish-native-audio-timeline",
@@ -406,12 +485,13 @@ def compile_timelines(
             "voice_audio_source": "speaker_reference_audio",
             "dialogue_source": "seedance",
             "native_ambience_source": "seedance",
-            "seedance_background_music": False,
-            "background_music_source": "none",
+            "seedance_background_music": True,
+            "background_music_source": "seedance_native",
             "preserve_clip_sync": True,
             "cross_segment_native_audio": any(
                 boundary["overlap_seconds"] > 0 for boundary in boundaries
             ),
+            "terminal_fade_seconds": TERMINAL_AUDIO_FADE_SECONDS,
         },
         "tracks": [
             {
@@ -421,9 +501,9 @@ def compile_timelines(
                 "events": native_events,
             }
         ],
-        "music_provider": "none",
-        "seedance_background_music": False,
-        "background_music_source": "none",
+        "music_provider": "seedance",
+        "seedance_background_music": True,
+        "background_music_source": "seedance_native",
     }
     return picture_edl, audio_timeline
 

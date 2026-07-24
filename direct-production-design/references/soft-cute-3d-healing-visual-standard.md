@@ -1,5 +1,13 @@
 # Soft & Cute 3D Healing Animation Visual Standard
 
+## Contents
+
+1. Authority, scope, and originality
+2. Character form, identity, and natural-species casting
+3. Materials, lighting, lens, color, locations, and props
+4. Independent-Segment action, camera, and interaction grammar
+5. Negative constraints, department obligations, and final checks
+
 ## Authority and scope
 
 Use **Original Soft & Cute 3D Healing Animation** as the project's default render
@@ -194,8 +202,8 @@ Reject or explicitly exclude, as applicable:
 - neutral-model character portraits, blank wildlife stares, empty catalogue smiles,
   missing thought, unmotivated expression, or decorative props invented without a
   production-design need;
-- quadrupedal or natural-animal body plans for a `lead`, `supporting`, or other
-  dialogue-owning main story character;
+- humanized torsos, added arms/hands/feet, upright bipedal posing, or other
+  species-incoherent anatomy applied to a natural-animal character;
 - realistic adult proportions, undersized/hollow/dead eyes, thin limbs, visible
   joints, sharp points, hard corners, or identity drift;
 - changed character color, clothing, pattern, accessory, eye shape/highlight,

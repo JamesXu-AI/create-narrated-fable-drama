@@ -14,7 +14,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import time
 from typing import Any
 
 
@@ -30,7 +29,7 @@ from post_timeline import (  # noqa: E402
 )
 
 
-provider_path = Path(__file__).resolve().parent / "providers" / "seedaudio.py"
+provider_path = Path(__file__).resolve().parent / "seedaudio.py"
 provider_spec = importlib.util.spec_from_file_location("project_seedaudio", provider_path)
 if provider_spec is None or provider_spec.loader is None:
     raise RuntimeError(f"Cannot load SeedAudio provider: {provider_path}")
@@ -366,18 +365,18 @@ def detect_baked_seedance_music(
                     "kind": "segment_script_configuration",
                 }
             )
-        artifacts_path = (
+        segment_root = (
             task_dir
             / ".pending"
             / "virtual-production"
             / "generation-segments"
             / f"segment-{segment_id:03d}"
-            / "artifacts.json"
         )
-        if not artifacts_path.is_file():
+        record_path = segment_root / "production-record.json"
+        if not record_path.is_file():
             continue
         try:
-            artifacts = json.loads(artifacts_path.read_text(encoding="utf-8"))
+            artifacts = json.loads(record_path.read_text(encoding="utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             continue
         audio_analysis = artifacts.get("audio_analysis")
@@ -389,7 +388,7 @@ def detect_baked_seedance_music(
             evidence.append(
                 {
                     "segment_id": segment_id,
-                    "source": str(artifacts_path.resolve()),
+                    "source": str(record_path.resolve()),
                     "kind": "persisted_media_analysis",
                 }
             )
@@ -405,21 +404,6 @@ def _declares_no_background_music(text: str) -> bool:
             "without background music",
             "background music is forbidden",
         )
-    )
-
-
-def _request_text(path: Path) -> str:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise MusicProductionError(f"Invalid Seedance request: {path}") from exc
-    content = payload.get("content") if isinstance(payload, dict) else None
-    if not isinstance(content, list):
-        raise MusicProductionError(f"Seedance request has no content list: {path}")
-    return "\n".join(
-        str(item.get("text") or "")
-        for item in content
-        if isinstance(item, dict) and item.get("type") == "text"
     )
 
 
@@ -464,13 +448,23 @@ def validate_no_seedance_background_music(
                     "kind": "missing_segment_no_background_music_contract",
                 }
             )
-        request_path = generation_root / segment_name / "seedance-request.json"
-        request_text = _request_text(request_path)
+        record_path = generation_root / segment_name / "production-record.json"
+        record = (
+            json.loads(record_path.read_text(encoding="utf-8"))
+            if record_path.is_file()
+            else {}
+        )
+        submitted_prompt = record.get("submitted_prompt")
+        if not isinstance(submitted_prompt, str) or not submitted_prompt.strip():
+            raise MusicProductionError(
+                f"Production record lacks submitted_prompt: {record_path}"
+            )
+        request_text = submitted_prompt
         if not _declares_no_background_music(request_text):
             defects.append(
                 {
                     "segment_id": segment_id,
-                    "source": str(request_path.resolve()),
+                    "source": str(record_path.resolve()),
                     "kind": "submitted_prompt_allows_background_music",
                 }
             )
@@ -478,7 +472,7 @@ def validate_no_seedance_background_music(
             {
                 "segment_id": segment_id,
                 "segment_script": str(script_path.resolve()),
-                "seedance_request": str(request_path.resolve()),
+                "submitted_prompt_record": str(record_path.resolve()),
                 "script_contract": "explicit_false" if explicit_false else "prompt_text",
                 "submitted_prompt_contract": "no_background_music",
             }
@@ -705,7 +699,7 @@ def compact_segment_performance(script_path: Path, limit: int = 520) -> str:
         )[0]
     except IndexError as exc:
         raise MusicProductionError(
-            f"Invalid Seed Master Route B Segment Script: {script_path}"
+            f"Invalid local Seedance Segment Prompt: {script_path}"
         ) from exc
     kept: list[str] = []
     for raw in section.splitlines():
@@ -888,41 +882,19 @@ def generate_audio(
             "reference_path": str(reference_path.resolve()),
         },
     )
-    result: dict[str, Any] | None = None
-    provider_attempt = 0
-    for provider_attempt in range(1, 4):
-        print(
-            f"GENERATE {output.stem} reference={reference_kind} "
-            f"attempt={provider_attempt}/3",
-            flush=True,
-        )
-        try:
-            result = seedaudio.request_audio(payload, timeout=timeout)
-            break
-        except Exception as exc:
-            detail = str(exc).lower()
-            transient = any(
-                marker in detail
-                for marker in (
-                    '"http_status": 500',
-                    "audio risk audit",
-                    "network request failed",
-                    "timed out",
-                    "connection reset",
-                )
-            )
-            if not transient or provider_attempt == 3:
-                raise
-            print(
-                f"RETRY {output.stem} transient_provider_failure "
-                f"next_attempt={provider_attempt + 1}/3",
-                flush=True,
-            )
-            time.sleep(2)
-    if result is None:
-        raise MusicProductionError("SeedAudio provider returned no result")
+    print(
+        f"GENERATE {output.stem} reference={reference_kind} attempt=1/1",
+        flush=True,
+    )
+    try:
+        result = seedaudio.request_audio(payload, timeout=timeout)
+    except Exception as exc:
+        raise MusicProductionError(
+            f"SeedAudio provider attempt failed: {exc}. Automatic retry is disabled; "
+            "obtain fresh human confirmation."
+        ) from exc
     persisted = save_provider_audio(result, output, timeout=timeout)
-    persisted["provider_attempt_count"] = provider_attempt
+    persisted["provider_attempt_count"] = 1
     write_json(response_path, persisted)
     print(
         f"GENERATED {output.name} duration={media_duration(output):.3f}s "

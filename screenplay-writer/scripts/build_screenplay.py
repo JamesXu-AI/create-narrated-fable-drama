@@ -15,12 +15,12 @@ SCRIPTS_ROOT = REPOSITORY_ROOT / "screenplay-writer" / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from story_video.character_performance_map import (  # noqa: E402
+from character_performance_map import (  # noqa: E402
     load_character_performance_map,
 )
-from story_video.runtime_support import StoryVideoError  # noqa: E402
-from story_video.screenplay_contract import load_screenplay_file  # noqa: E402
-from story_video.task_paths import task_root, validate_root_files  # noqa: E402
+from runtime_support import StoryVideoError  # noqa: E402
+from screenplay_contract import load_screenplay_file  # noqa: E402
+from task_paths import task_root, validate_root_files  # noqa: E402
 from task_input import load_task_json  # noqa: E402
 
 

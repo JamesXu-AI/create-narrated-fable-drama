@@ -1,6 +1,6 @@
 ---
 name: direct-production-design
-description: "Understand the approved story and screenplay, then author exact visual-asset plans for characters, silent groups, props, appearance states, dressed Location masters, and the semantic split between embedded background NPCs and independent performers. Execute those plans without changing story, performance, or cinematography."
+description: "Understand the approved forest-animal educational story and screenplay, then author exact visual-asset plans for animal characters, silent groups, props, appearance states, dressed forest Location masters, and the semantic split between embedded background animals and independent performers. Execute those plans while preserving one coherent forest world without changing story, performance, or cinematography."
 ---
 
 # Direct Production Design
@@ -10,13 +10,24 @@ description: "Understand the approved story and screenplay, then author exact vi
 Own production design, the visual bible, model-authored image prompts, image assets,
 and character voice references. Do not write story, dialogue, performance calls,
 camera design, Storyboards, Seedance Prompts, editing, subtitles, or final sound.
-Use only repository-local providers. Do not call another image Skill.
+Never invoke, load, delegate to, or depend on an external Skill. Use only
+repository-local providers. Generate every image only through
+`scripts/generate_visual_asset.py` and the bundled `scripts/seedream.py` adapter.
+Never call `image2`, `imagegen`, `image_gen`, or another image Skill/provider
+wrapper, including as a fallback or for edits.
 
 Begin only after the screenplay role-asset gate returns `PASS` and image generation
 is unlocked. Read `task.json`, `story.md`, the current screenplay and performance
-tables, the current Storyboard when present, and the visual standard. An optional
-aesthetic study is offline evidence only; its source frames never enter a provider
-request.
+tables, the current Storyboard when present, the complete
+[Forest Animal Education Production Standard](../references/forest-animal-education-production-standard.md),
+the complete
+[Human-in-the-Loop Guided Workflow](../references/human-in-the-loop-guided-workflow.md),
+and the complete
+[Soft & Cute 3D Healing Animation Visual Standard](references/soft-cute-3d-healing-visual-standard.md)
+before authoring the plan. Treat that file as the department's single Look
+authority; do not substitute a remembered summary, generic “cute 3D” wording, or a
+second style bible. An optional aesthetic study is offline evidence only; its
+source frames never enter a provider request.
 
 ## Single model-authored plan
 
@@ -64,8 +75,15 @@ pure-white background authority declared by the plan contract. A dressed Locatio
 master describes its real environment instead. Do not mention a forest,
 room, or other Scene environment in a pure-white asset Prompt.
 
-The style section uses the single exact project style authority. Do not imitate a
-brand, studio, franchise, artist, renderer, or protected identity.
+The style section uses the single exact project style authority. Author the
+asset-specific form, identity, material, palette, lighting, focus, and composition
+locks required by the visual standard in the appropriate Prompt fields; do not
+assume `style_en` replaces those decisions. Do not imitate a brand, studio,
+franchise, artist, renderer, or protected identity.
+Every visual asset Prompt must also exclude unintended typography, logos,
+watermarks, duplicated subjects, and duplicated anatomy. A Location may contain
+only its declared closed embedded population; the exclusions must not erase that
+approved population.
 
 ## Character actors
 
@@ -82,6 +100,14 @@ Do not place story objectives, relationships, first-line delivery, current emoti
 victory, defeat, injury, death, repentance, or Scene/Segment behavior in the actor
 profile or identity Prompt. Temporary visible states belong in explicit
 character-owned appearance-state assets.
+
+Keep each identity image single-subject. Never use a three-view, multi-view,
+contact sheet, or collage of the same person: Seedance may interpret the repeated
+views as separate performers. For a face-critical human, prefer one isolated
+neutral face close-up and one isolated full-body identity image when the current
+catalog supports both. If no valid face anchor exists, keep the single full-body
+authority and return observed ID drift for upstream asset rework; never crop or
+invent a face anchor in virtual production.
 
 Every character plan carries a model-authored exhaustive `body_topology`. Natural
 quadrupeds remain four-legged; birds retain two legs and two wings; insects retain
@@ -113,6 +139,13 @@ do not create separate prop assets merely to keep them from disappearing.
 
 An appearance-state asset references exactly its owning character and changes only
 the model-authored visible state.
+
+Treat the forest as one authored world, not interchangeable green scenery. Encode
+its forest type, season, time, weather, canopy, understory, forest floor,
+vegetation/material palette, paths, zones, entrances/exits, landmarks, population,
+relative scale, light, moisture, and ambience through the existing Location and
+continuity fields. Reuse the same Location master for every unchanged revisit.
+Do not create a new layout for a crop or camera-angle change.
 
 A dressed Location master is production design's complete environment and stable
 population decision, not a generic background. After understanding the screenplay's
@@ -170,6 +203,13 @@ run `--inspect-semantic-reuse`; Codex itself decides visible equivalence using
 decision. A changed dependency invalidates its consumers.
 
 ## Execution
+
+Before an image or voice generation batch, present one compact natural-language
+plan covering what will be generated or overwritten, the forest/animal continuity
+that matters, and what follows; pause for confirmation. Keep prompts, hashes,
+payloads, and runtime JSON internal unless requested. After the batch, show or link
+the results, report only actionable continuity/quality findings, and propose the
+next step. Do not create an approval file or force confirmation asset by asset.
 
 ```text
 python3 screenplay-writer/scripts/validate_role_asset_scope.py \

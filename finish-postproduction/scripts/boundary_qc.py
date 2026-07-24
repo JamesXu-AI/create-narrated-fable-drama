@@ -280,6 +280,7 @@ def measure_boundary(
     outgoing: object,
     incoming: object,
     config: dict[str, Any],
+    boundary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Measure a short robust endpoint window without making a picture verdict."""
     analysis = config["analysis"]
@@ -287,19 +288,43 @@ def measure_boundary(
     width, height = _analysis_geometry(outgoing, int(analysis["width"]))
     frame_count = int(analysis["anchor_frame_count"])
     frame_rate = int(strict["frame_rate"])
-    outgoing_probe = getattr(outgoing, "probe")
     outgoing_path = Path(getattr(outgoing, "video_path"))
     incoming_path = Path(getattr(incoming, "video_path"))
-    outgoing_frames = _extract_tail_yuv_frames(
-        outgoing_path,
-        frame_count=frame_count,
-        frame_rate=frame_rate,
-        width=width,
-        height=height,
+    outgoing_probe = getattr(outgoing, "probe")
+    incoming_probe = getattr(incoming, "probe")
+    outgoing_source_out = float(
+        (boundary or {}).get(
+            "outgoing_source_out_seconds",
+            getattr(outgoing_probe, "duration_seconds"),
+        )
     )
+    incoming_source_in = float(
+        (boundary or {}).get("incoming_source_in_seconds", 0.0)
+    )
+    if boundary is None or (
+        abs(outgoing_source_out - float(getattr(outgoing_probe, "duration_seconds")))
+        < 1e-9
+        and incoming_source_in == 0.0
+    ):
+        outgoing_frames = _extract_tail_yuv_frames(
+            outgoing_path,
+            frame_count=frame_count,
+            frame_rate=frame_rate,
+            width=width,
+            height=height,
+        )
+    else:
+        outgoing_frames = _extract_yuv_frames(
+            outgoing_path,
+            start_seconds=max(0.0, outgoing_source_out - frame_count / frame_rate),
+            frame_count=frame_count,
+            frame_rate=frame_rate,
+            width=width,
+            height=height,
+        )
     incoming_frames = _extract_yuv_frames(
         incoming_path,
-        start_seconds=0.0,
+        start_seconds=incoming_source_in,
         frame_count=frame_count,
         frame_rate=frame_rate,
         width=width,
@@ -317,6 +342,8 @@ def measure_boundary(
         "analysis_frame_width": width,
         "analysis_frame_height": height,
         "analysis_frame_count_per_side": frame_count,
+        "outgoing_source_out_seconds": round(outgoing_source_out, 6),
+        "incoming_source_in_seconds": round(incoming_source_in, 6),
         "outgoing": outgoing_stats,
         "incoming": incoming_stats,
         "delta_target_minus_incoming": {
@@ -552,22 +579,27 @@ def _render_strict_sample(
     filters: list[str] = []
     picture_edit = str(boundary.get("picture_edit"))
     overlap = float(boundary.get("overlap_seconds") or 0.0)
+    outgoing_source_out = float(
+        boundary.get(
+            "outgoing_source_out_seconds",
+            getattr(outgoing_probe, "duration_seconds"),
+        )
+    )
+    incoming_source_in = float(boundary.get("incoming_source_in_seconds") or 0.0)
     if picture_edit in {"dissolve", "fade"}:
         handle = 1.0 + overlap / 2.0
-        outgoing_start = max(
-            0.0, float(getattr(outgoing_probe, "duration_seconds")) - handle
-        )
+        outgoing_start = max(0.0, outgoing_source_out - handle)
         filters.extend(
             [
                 f"[0:v]trim=start={outgoing_start:.6f}:duration={handle:.6f},"
                 f"setpts=PTS-STARTPTS,fps={frame_rate},scale={width}:{height},"
                 "setsar=1,format=yuv420p[v0]",
-                f"[1:v]trim=start=0:duration={handle:.6f},setpts=PTS-STARTPTS,"
+                f"[1:v]trim=start={incoming_source_in:.6f}:duration={handle:.6f},setpts=PTS-STARTPTS,"
                 f"fps={frame_rate},scale={width}:{height},setsar=1,format=yuv420p[v1]",
                 f"[0:a]atrim=start={outgoing_start:.6f}:duration={handle:.6f},"
                 "asetpts=PTS-STARTPTS,aresample=48000,"
                 "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0]",
-                f"[1:a]atrim=start=0:duration={handle:.6f},asetpts=PTS-STARTPTS,"
+                f"[1:a]atrim=start={incoming_source_in:.6f}:duration={handle:.6f},asetpts=PTS-STARTPTS,"
                 "aresample=48000,"
                 "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1]",
             ]
@@ -584,20 +616,18 @@ def _render_strict_sample(
             ]
         )
     else:
-        outgoing_start = max(
-            0.0, float(getattr(outgoing_probe, "duration_seconds")) - tail
-        )
+        outgoing_start = max(0.0, outgoing_source_out - tail)
         filters.extend(
             [
                 f"[0:v]trim=start={outgoing_start:.6f}:duration={tail:.6f},"
                 f"setpts=PTS-STARTPTS,fps={frame_rate},scale={width}:{height},"
                 "setsar=1,format=yuv420p[v0]",
-                f"[1:v]trim=start=0:duration={head:.6f},setpts=PTS-STARTPTS,"
+                f"[1:v]trim=start={incoming_source_in:.6f}:duration={head:.6f},setpts=PTS-STARTPTS,"
                 f"fps={frame_rate},scale={width}:{height},setsar=1,format=yuv420p[v1]",
                 f"[0:a]atrim=start={outgoing_start:.6f}:duration={tail:.6f},"
                 "asetpts=PTS-STARTPTS,aresample=48000,"
                 "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0]",
-                f"[1:a]atrim=start=0:duration={head:.6f},asetpts=PTS-STARTPTS,"
+                f"[1:a]atrim=start={incoming_source_in:.6f}:duration={head:.6f},asetpts=PTS-STARTPTS,"
                 "aresample=48000,"
                 "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1]",
                 f"[v0][v1]concat=n=2:v=1:a=0,fps={frame_rate},"
@@ -865,7 +895,7 @@ def prepare_boundary_qc(
         original_sample = directory / "original-strict-seam.mp4"
         _render_strict_sample(outgoing, incoming, boundary, original_sample, config)
         evidence = _extract_frame_evidence(original_sample, directory, config)
-        metrics = measure_boundary(outgoing, incoming, config)
+        metrics = measure_boundary(outgoing, incoming, config, boundary)
         status, reason, plan = triage_boundary(boundary, metrics, config)
         item: dict[str, Any] = {
             "boundary_id": f"{boundary['from']}--{boundary['to']}",
@@ -876,6 +906,7 @@ def prepare_boundary_qc(
             "transition_class": boundary.get("transition_class"),
             "picture_edit": boundary.get("picture_edit"),
             "overlap_seconds": boundary.get("overlap_seconds"),
+            "seedance_extension_trim": boundary.get("seedance_extension_trim"),
             "source_paths": {
                 "outgoing": str(Path(getattr(outgoing, "video_path")).resolve()),
                 "incoming": str(Path(getattr(incoming, "video_path")).resolve()),

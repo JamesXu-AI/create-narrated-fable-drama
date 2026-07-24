@@ -11,11 +11,15 @@ import sys
 
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
-if str(SCRIPT_ROOT) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_ROOT))
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_SCRIPTS_ROOT = REPOSITORY_ROOT / "scripts"
+for scripts_root in (SCRIPT_ROOT, PROJECT_SCRIPTS_ROOT):
+    if str(scripts_root) not in sys.path:
+        sys.path.insert(0, str(scripts_root))
 
 from assemble_segment_videos import assemble  # noqa: E402
 from build_subtitles import DEFAULT_STYLE, build  # noqa: E402
+from project_domain import ProjectDomainError, validate_project_profiles  # noqa: E402
 from post_timeline import TimelineError, probe_media  # noqa: E402
 
 
@@ -31,6 +35,10 @@ def _load_task(task_dir: Path) -> dict[str, object]:
         raise FinishError(f"Invalid task.json: {path}") from exc
     if not isinstance(payload, dict):
         raise FinishError("task.json must contain one JSON object")
+    try:
+        validate_project_profiles(payload, context=str(path))
+    except ProjectDomainError as exc:
+        raise FinishError(str(exc)) from exc
     if payload.get("voice_audio_source") != "speaker_reference_audio":
         raise FinishError(
             "task.json voice_audio_source must be speaker_reference_audio"
@@ -79,11 +87,11 @@ def finish(task_dir: Path, *, style_path: Path = DEFAULT_STYLE) -> dict[str, obj
     if not isinstance(audio_sources, dict):
         raise FinishError("Final delivery manifest lacks audio source declarations")
     if (
-        audio_sources.get("seedance_background_music") is not False
-        or audio_sources.get("background_music_source") != "none"
+        audio_sources.get("seedance_background_music") is not True
+        or audio_sources.get("background_music_source") != "seedance_native"
     ):
         raise FinishError(
-            "Main final delivery must contain no background music source"
+            "Main final delivery must preserve Seedance-native background music"
         )
     boundary_qc = delivery_manifest.get("boundary_qc")
     if (

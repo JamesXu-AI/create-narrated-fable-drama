@@ -1,4 +1,4 @@
 interface:
-  display_name: "Cinematography Previsualization"
-  short_description: "Create one self-contained cinematic storyboard.md"
-  default_prompt: "Use $previsualize-cinematography with Seedance Master Route A to preserve the approved screenplay while adding directing and cinematography. Separate temporal evidence from Location-owned world/population evidence in every Segment and every nonadjacent revisit. Release only one self-contained storyboard.md with no JSON, compile manifest, trace, ledger, or companion artifact."
+  display_name: "Forest Animal Previsualization"
+  short_description: "Forest continuity with cinematic camera movement"
+  default_prompt: "Use $previsualize-cinematography to create one forest-animal storyboard.md, preserve every required character and forest state, use close-up/medium-close coverage as the baseline for decisive faces, reactions, paws/hands, wounds, clues, and educational details, allow wide shots only for indispensable new spatial information, avoid frontal stage-like all-cast masters, require every extension to use white-model quality reset, and after one tail-frame or extension handoff make the next same-scene Segment reference-free and open ECU/CU/MCU from a decisively new angle/viewpoint/composition; use bundled video-cinematography as the specialist authority for cinematic shot size and camera movement, and present the upcoming videos as a concise editable director plan rather than internal rows or JSON."

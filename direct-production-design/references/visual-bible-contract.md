@@ -136,17 +136,8 @@ final frame or silent final-two-second input may guide the opening state, but ne
 transfers source dialogue, lip phase, audio, or completed action. Production design
 does not choose that input.
 
-## Required `direct-production-design/visual-production-spec.md` sections
-
-Keep the fixed metadata and these populated sections:
-
-1. `Unified Style`
-2. `Character Appearance Rules`
-3. `Environment Appearance Rules`
-4. `Prop and Material Rules`
-5. `Color System`
-6. `Lighting System`
-7. `Segment Boundary and Continuity Rules`
-
-Use concrete, project-specific statements. Vague phrases such as “cinematic,”
-“beautiful,” “high quality,” or “keep consistent” are not verifiable rules.
+Encode every project-specific style, character, environment, prop/material, color,
+lighting, and continuity decision directly in
+`production-design-plan.json`. Do not create a companion
+`visual-production-spec.md`. Vague phrases such as “cinematic,” “beautiful,” “high
+quality,” or “keep consistent” are not verifiable rules.

@@ -14,7 +14,7 @@ for script_root in (REPOSITORY_ROOT / "screenplay-writer" / "scripts",):
     if str(script_root) not in sys.path:
         sys.path.insert(0, str(script_root))
 
-from story_video.character_performance_map import (  # noqa: E402
+from character_performance_map import (  # noqa: E402
     MAP_RELATIVE_PATH,
     load_character_performance_map,
     role_asset_scope_gate,

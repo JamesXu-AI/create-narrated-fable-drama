@@ -19,7 +19,7 @@ STORYBOARD_SCRIPT_ROOT = REPOSITORY_ROOT / "virtual-production" / "scripts"
 if str(STORYBOARD_SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(STORYBOARD_SCRIPT_ROOT))
 
-from route_b_handoff import load_route_b_handoff  # noqa: E402
+from segment_handoff import load_segment_handoff  # noqa: E402
 
 DEFAULT_STYLE = SKILL_ROOT / "assets" / "subtitle-style.json"
 ASS_PLAY_RESOLUTION_HEIGHT = 288.0
@@ -80,11 +80,13 @@ def _validate_style(style: dict[str, Any]) -> None:
         )
     if style["contract"] != "finish-subtitle-style":
         raise SubtitleBuildError("Unsupported subtitle-style contract.")
-    if style["text_authority"] != "seed_master_route_b_exact_dialogue_ledger":
-        raise SubtitleBuildError("Subtitle text authority must be the Route B exact-dialogue ledger.")
+    if style["text_authority"] != "private_seedance_segment_plan_dialogue_cues":
+        raise SubtitleBuildError(
+            "Subtitle text authority must be the private Segment-plan cues."
+        )
     if (
         style["timing_authority"]
-        != "seed_master_route_b_dialogue_duration_ledger_plus_picture_edl"
+        != "private_seedance_segment_plan_dialogue_timing_plus_picture_edl"
     ):
         raise SubtitleBuildError("Subtitle timing authority is invalid.")
     for field in (
@@ -552,7 +554,7 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
     )
     edl = _load_json(edl_path)
     events = _picture_events(edl)
-    storyboards = load_route_b_handoff(task_dir)
+    storyboards = load_segment_handoff(task_dir)
     storyboard_ids = list(storyboards)
     if storyboard_ids != list(events):
         raise SubtitleBuildError("Storyboard coverage/order differs from picture EDL.")
@@ -759,8 +761,8 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
             )
     return {
         "contract": "finish-subtitle-cues-v2",
-        "text_authority": "seed_master_route_b_exact_dialogue_ledger",
-        "timing_authority": "seed_master_route_b_dialogue_duration_ledger_plus_picture_edl",
+        "text_authority": "private_seedance_segment_plan_dialogue_cues",
+        "timing_authority": "private_seedance_segment_plan_dialogue_timing_plus_picture_edl",
         "language": language,
         "style_path": str(style_path.resolve()),
         "picture_edl_path": str(edl_path.resolve()),
@@ -963,14 +965,18 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
             task_dir / ".pending" / "finish-postproduction" / "audio-timeline.json"
         )
         audio_timeline = _load_json(audio_timeline_path)
-        if audio_timeline.get("seedance_background_music") is not False:
+        if audio_timeline.get("seedance_background_music") is not True:
             raise SubtitleBuildError(
-                "audio-timeline.json must declare seedance_background_music=false"
+                "audio-timeline.json must declare seedance_background_music=true"
             )
         music_provider = audio_timeline.get("music_provider")
-        if music_provider != "none":
+        if music_provider != "seedance":
             raise SubtitleBuildError(
-                "Main final delivery requires music_provider=none"
+                "Main final delivery requires music_provider=seedance"
+            )
+        if audio_timeline.get("background_music_source") != "seedance_native":
+            raise SubtitleBuildError(
+                "Main final delivery requires Seedance-native background music"
             )
         boundary_qc_path = (
             task_dir
@@ -1009,9 +1015,9 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
             "audio_sources": {
                 "voice_audio_source": "speaker_reference_audio",
                 "dialogue_source": "seedance",
-                "native_background_audio_source": "seedance_ambience_and_foley_no_music",
-                "seedance_background_music": False,
-                "background_music_source": music_provider,
+                "native_background_audio_source": "seedance_ambience_foley_and_music",
+                "seedance_background_music": True,
+                "background_music_source": "seedance_native",
                 "generate_audio": True,
             },
             "audio_timeline": str(audio_timeline_path.resolve()),

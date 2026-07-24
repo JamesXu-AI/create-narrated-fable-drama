@@ -1,0 +1,11 @@
+{
+  "contract": "seedance-white-model-quality-reset-v1",
+  "operation": "video_edit",
+  "strategy": "white_model_video_edit",
+  "prompt_zh": "严格编辑 @Video1：将视频中的人物、动物和可动物体全部转换为结构清晰稳定的纯白 3D 白模，统一纯白材质、纯白背景、无色彩、无纹理、无阴影。严格保持原视频的主体数量、身体结构、镜头、构图、动作、表演、口型、空间关系、时序、速度、时长和剪辑不变；不添加、删除、复制或替换任何主体，不生成文字、字幕、Logo 或水印。除白模化外，其余内容保持不变。",
+  "duration": -1,
+  "generate_audio": true,
+  "watermark": false,
+  "return_last_frame": false,
+  "preserve_source_audio_by_remux": true
+}

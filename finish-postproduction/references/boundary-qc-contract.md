@@ -25,6 +25,11 @@ the sample contains exactly 48 ordered frames. For a dissolve or fade, render th
 authored effect in a two-second sample centered on that transition instead of
 substituting a raw splice.
 
+For an incoming `video_extension`, "final" and "opening" mean the EDL source points
+after the official cleanup: six frames removed from the predecessor tail and one
+frame removed from the continuation head. The manifest records both source points,
+and the strict sample must not silently fall back to the untrimmed container edges.
+
 Each boundary directory contains the strict sample, 48 readable frames, frame
 manifest, contact sheet, deterministic color/similarity measurements, and any
 repair candidates. The final-timeline audit creates the same evidence from the
