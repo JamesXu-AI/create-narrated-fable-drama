@@ -1,4 +1,0 @@
-interface:
-  display_name: "Forest Animal Story Writer"
-  short_description: "Write forest-animal educational stories and scripts"
-  default_prompt: "Use $screenplay-writer to create the requested forest-animal educational story or screenplay, preserve every animal's presence and forest causality, favor close-up/reaction/insert/POV coverage for decisive faces and details, use wide shots only for necessary new spatial information, and after one same-scene state-match or continuous-motion handoff require a settled strong-coverage-reset boundary opening tight from a decisively new angle; report the result plus next step in plain language without asking the human to inspect internal artifacts."

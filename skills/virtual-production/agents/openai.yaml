@@ -1,0 +1,4 @@
+interface:
+  display_name: "Virtual Production · 虚拟制片"
+  short_description: "Generate narrated-drama and fable Seedance segments"
+  default_prompt: "Use $virtual-production to author every exact selected-style Seedance Prompt, require the first complete Prompt-set and speech-rate gate to pass, then begin one-Segment-at-a-time human confirmation while preserving natural storyteller transitions."

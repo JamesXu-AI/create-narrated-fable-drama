@@ -1,4 +1,0 @@
-interface:
-  display_name: "Forest Animal Production Design"
-  short_description: "Lock animal assets and one coherent forest world"
-  default_prompt: "Use $direct-production-design to lock the soft-cute 3D animal identities and coherent forest world, generate every image only through the bundled Seedream adapter—never image2 or another image Skill—and retain only the plan, reusable catalog, final media, and minimum reuse evidence."

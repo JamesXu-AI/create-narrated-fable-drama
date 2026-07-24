@@ -20,14 +20,37 @@ When reporting progress, use one compact pattern:
 请确认：
 ```
 
-Pause only when:
+Before all first-pass Segment Prompts exist and the full Prompt/speech-rate gate
+passes, pause only when:
 
-1. a media-generation or destructive overwrite is about to occur;
-2. one video attempt has finished and the human must choose what happens next;
-3. a material creative choice cannot safely be inferred.
+1. target country is missing;
+2. a material creative choice cannot safely be inferred; or
+3. a destructive overwrite is about to occur.
+
+The formal Segment human loop begins only after that full gate. From then on,
+pause before each video attempt and after each completed attempt.
 
 Do not require a separate approval for every internal document, validator, JSON
 file, or department handoff.
+
+## Workflow discipline
+
+The declared production sequence is executable authority, not a user preference
+that must be reconfirmed. When a requested downstream result is missing an upstream
+artifact, create and validate the missing non-media prerequisites in sequence.
+Never bypass screenplay, production-design, Storyboard, Prompt-materialization, or
+their release gates.
+
+Keep the task isolated to the current repository, its explicit `TASK_DIR`, and the
+current repository's `assets/`. Never search another project, prior project copy,
+sibling runtime, or Git recovery data for a creative artifact, even when the title
+or story matches. Existing current-repository assets may be reused only under the
+current task authority and user direction.
+
+Do not ask the human to repeat or reconfirm a workflow rule or direction already
+established in the conversation or this repository. Continue through deterministic
+non-media prerequisites automatically. Pause only at the gates listed below or when
+a genuinely material creative choice cannot be inferred safely.
 
 ## Natural-language direction
 
@@ -36,12 +59,12 @@ Accept directions such as:
 > 第二个视频从小鹿从树后走出开始，开头淡化一点，所有角色都要在场。
 
 Translate that request internally into the affected opening transition, Shot
-action, staging, character-presence requirements, forest continuity, references,
+action, staging, character-presence requirements, story-world continuity, references,
 and Segment Prompt. Repair only affected downstream artifacts, validate them, and
 return a revised compact next-step plan. Never ask the human to edit a JSON field,
 hash, ledger, or internal artifact path.
 
-The human may change story, dialogue, animal appearance, performance, forest
+The human may change story, dialogue, character appearance, performance, story-world
 design, population, camera, lighting, sound, transition, duration, reference,
 Segment order, or delivery at any point.
 
@@ -54,7 +77,7 @@ to direct it:
 生成前
 要生成：第几个视频 / Segment
 怎么开始：转场、起始画面和角色在场情况
-这段发生什么：动作、对白、森林状态
+这段发生什么：动作、对白、叙述方式和场景状态
 怎么结束：落点和与下一段的衔接
 生成成功后下一步：
 你可以修改：
@@ -66,7 +89,7 @@ call. Keep exact prompts, hashes, validation records, and provider payloads
 internal unless the human asks to inspect them.
 
 “Internal” does not mean “persist everything.” Virtual production keeps only the
-authored Prompt/private-plan pair before generation. It computes the resolved
+authored Prompt before generation. It derives the resolved transport plan from the Storyboard
 execution plan in memory, keeps one mutable submission record only while a provider
 attempt is active, and reduces a successful Segment to `video.mp4`,
 `last-frame.png`, and `production-record.json`. Do not create request/response/poll
@@ -114,7 +137,7 @@ user-facing approval JSON, confirmation receipts, hash ledgers, review reports,
 compatibility packets, visual-spec companions, location-continuity copies, or
 extra checkpoints.
 
-For a pending Segment, one exact Prompt plus one private machine plan is sufficient.
+For a pending Segment, one exact Prompt is sufficient; Storyboard remains its plan.
 For a successful image, keep the final image and its one reuse brief; do not keep
 duplicate Prompt/request/response sidecars. Provider polling and diagnostic files
 may remain only for an active or failed attempt when they are needed to resume or

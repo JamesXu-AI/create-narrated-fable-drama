@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fable Production Design"
+  short_description: "Lock selected-style identities, voices, and worlds"
+  default_prompt: "Use $direct-production-design to create reusable assets in the exact screenplay Visual Style, defaulting to 3D Healing Animation only when no style was supplied, while leaving narration and camera authority upstream."

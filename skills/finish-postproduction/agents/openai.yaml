@@ -1,0 +1,4 @@
+interface:
+  display_name: "Finish Postproduction · 寓言剧后期"
+  short_description: "保持对白与角色旁白连续并完成最终成片"
+  default_prompt: "使用 $finish-postproduction 在所有 AI 解说剧/寓言 Segment 均由人接受后展示简洁装配计划并等待确认，再完成原生声音、自然旁白衔接、字幕和双版本成片，最后等待验收。"

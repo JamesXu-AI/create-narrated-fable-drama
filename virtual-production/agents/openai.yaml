@@ -1,4 +1,0 @@
-interface:
-  display_name: "Virtual Production · 虚拟制片"
-  short_description: "Generate consistent forest-animal Seedance segments"
-  default_prompt: "Use $virtual-production to author each Seedance Prompt directly from the bundled local contracts without any external production Skill, keep only one Prompt and one private plan per pending Segment, preserve storyboard Shot Size and continuity exactly, and pause before and after each single attempt."

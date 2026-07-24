@@ -1,4 +1,0 @@
-interface:
-  display_name: "Seedance Video Review"
-  short_description: "检查森林、动物、画面和声音连续性"
-  default_prompt: "Use $seedance-video-review to watch the complete forest-animal video with sound, verify every extension used its white-model proxy, verify each strong coverage reset has no predecessor media and opens ECU/CU/MCU from a decisive new angle while preserving semantic state, return NO_ISSUES or concise owner-routed corrections, and feed one recommended next action into the human-facing after-video confirmation."

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Forest Animal Education Video"
-  short_description: "Produce consistent forest-animal educational films"
-  default_prompt: "Use $forest-animal-education-video as a fully repository-local director workflow: never invoke an external production Skill, author the Storyboard and Seedance Prompts locally, generate images only with the bundled Seedream adapter, retain only the minimal authoritative artifacts, and pause before and after each single video attempt without automatic retries."
+  display_name: "Narrated Fable Drama"
+  short_description: "Turn a Story into a guided 16:9 narrated fable drama"
+  default_prompt: "Use $create-narrated-fable-drama to turn my Story into a 16:9 narrated fable drama, require a target country, use my conversational style/resolution or default to 3D Healing Animation at 1080p, run full speech-rate gates after screenplay, Storyboard, and the complete first Prompt set, then begin one-Segment-at-a-time human confirmation."

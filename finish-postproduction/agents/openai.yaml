@@ -1,4 +1,0 @@
-interface:
-  display_name: "Finish Postproduction · 原生音乐主流程"
-  short_description: "保持森林动物连续性并完成最终成片"
-  default_prompt: "使用 $finish-postproduction 在所有森林动物视频均由人接受后先展示简洁装配计划并等待确认，再完成原生声音、接缝、字幕和双版本成片，生成后继续等待人的验收或修改意见。"

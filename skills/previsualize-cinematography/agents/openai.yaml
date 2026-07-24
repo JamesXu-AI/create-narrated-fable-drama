@@ -1,0 +1,4 @@
+interface:
+  display_name: "Narrated Fable Previsualization"
+  short_description: "Direct natural speech transitions into 16:9 Storyboards"
+  default_prompt: "Use $previsualize-cinematography to create one 16:9 storyboard.md that preserves the selected style/resolution and makes every speech handoff directly executable, then require a full speech-window rate PASS."
