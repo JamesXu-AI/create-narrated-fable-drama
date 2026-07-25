@@ -7,10 +7,18 @@ keyword table, or story-specific code.
 For every target returned by a production-design
 `--inspect-semantic-reuse` command, read all of these inputs:
 
+- canonical asset-library root and catalog path;
+- every `uncatalogued_exact_path_matches` record;
 - target asset ID, type, and complete reusable semantic description;
 - every same-type candidate's source asset ID and stored reusable semantic
   description;
 - declared upstream visual dependencies.
+
+Resolve the repository root from the owning Skill. Never search only from the
+task working directory. If an exact planned media path already exists in the
+canonical library but lacks a catalog row, stop before generation and recover
+the row's validated semantics and provider URI. Do not regenerate, overwrite, or
+classify the existing media from its filename alone.
 
 Python is allowed to retrieve usable same-type candidates only. It must never
 decide semantic equivalence from an ID, path, filename, description string,

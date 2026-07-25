@@ -27,6 +27,16 @@ Each shot states one dominant camera behavior, visible subject action and
 expression, blocking and gaze, speech ownership, listener response, effects,
 ambience, and edit landing. Prefer natural event order over exact time ranges.
 
+Before Shot 1, state the exact visible-character economy, eyeline axis/screen
+directions, and close-up-led policy from the Storyboard. Begin every beat
+`Shot N: <exact shot_size>.` Keep one story-active subject or one
+speaker/listener pair visible whenever authority permits. Preserve A/B screen
+sides, opposed look directions, and the same camera side of the axis through
+reverses. ECU/CU/MCU dominate. A medium-wide/wide/extreme-wide beat is legal only
+as a literal `position-change exception:` covering the shortest readable
+entrance/exit/crossing/approach/retreat/mark-transfer interval before returning
+tight.
+
 Speech uses `{exact words}` and appears exactly once. The prompt must make these
 facts unmistakable:
 
@@ -64,4 +74,6 @@ without predecessor media.
 Reject wrong speaker, wrong mouth movement, narrator voice replacement, unnatural
 dialogue-to-narration switching, clipped lines, paraphrase, duplicate subjects,
 identity drift, text, logos, watermarks, continuity jumps, extension replay,
-missing ambience bridges, or progressive quality degradation.
+missing ambience bridges, decorative/extra characters, crowded full-cast staging,
+ambiguous or reversed eyelines, lost close-up dominance, an unearned wider view,
+or progressive quality degradation.

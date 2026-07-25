@@ -7,10 +7,6 @@ import math
 from pathlib import Path
 from typing import Any
 
-from narrated_fable_drama.contracts.boundary import (
-    AUTOMATIC_COLOR_MATCH_PICTURE_EDIT_MODES,
-    COLOR_MATCH_EXCLUDED_BOUNDARY_CLASSES,
-)
 from .qc_policy import BoundaryQCError
 from narrated_fable_drama.media.ffmpeg import MediaCommandError, run
 
@@ -190,7 +186,7 @@ def measure_boundary(
     outgoing: object,
     incoming: object,
     config: dict[str, Any],
-    boundary: dict[str, Any] | None = None,
+    boundary: dict[str, Any],
 ) -> dict[str, Any]:
     """Measure a short robust endpoint window without making a picture verdict."""
     analysis = config["analysis"]
@@ -202,16 +198,9 @@ def measure_boundary(
     incoming_path = Path(getattr(incoming, "video_path"))
     outgoing_probe = getattr(outgoing, "probe")
     incoming_probe = getattr(incoming, "probe")
-    outgoing_source_out = float(
-        (boundary or {}).get(
-            "outgoing_source_out_seconds",
-            getattr(outgoing_probe, "duration_seconds"),
-        )
-    )
-    incoming_source_in = float(
-        (boundary or {}).get("incoming_source_in_seconds", 0.0)
-    )
-    if boundary is None or (
+    outgoing_source_out = float(boundary["outgoing_source_out_seconds"])
+    incoming_source_in = float(boundary["incoming_source_in_seconds"])
+    if (
         abs(outgoing_source_out - float(getattr(outgoing_probe, "duration_seconds")))
         < 1e-9
         and incoming_source_in == 0.0
@@ -279,175 +268,3 @@ def measure_boundary(
             6,
         ),
     }
-
-
-def _has_detectable_mismatch(
-    metrics: dict[str, Any], config: dict[str, Any]
-) -> bool:
-    delta = metrics["delta_target_minus_incoming"]
-    threshold = config["detection"]
-    return any(
-        (
-            abs(float(delta["luma_mean"])) >= float(threshold["mean_luma_delta"]),
-            abs(float(delta["luma_q10"])) >= float(threshold["shadow_luma_delta"]),
-            abs(float(delta["luma_q90"]))
-            >= float(threshold["highlight_luma_delta"]),
-            abs(float(delta["saturation_ratio_delta"]))
-            >= float(threshold["saturation_ratio_delta"]),
-            float(delta["chroma_center_distance"])
-            >= float(threshold["chroma_center_distance"]),
-        )
-    )
-
-
-def build_repair_plan(metrics: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    incoming = metrics["incoming"]
-    delta = metrics["delta_target_minus_incoming"]
-    saturation_factor = float(delta["saturation_factor"])
-    u_shift = float(metrics["outgoing"]["u_mean"]) - (
-        128.0 + (float(incoming["u_mean"]) - 128.0) * saturation_factor
-    )
-    v_shift = float(metrics["outgoing"]["v_mean"]) - (
-        128.0 + (float(incoming["v_mean"]) - 128.0) * saturation_factor
-    )
-    return {
-        "contract": "finish-boundary-color-repair/v1",
-        "repair_scope": "incoming_luma_chroma_only",
-        "source_mutation": False,
-        "fade_seconds": float(config["repair"]["fade_seconds"]),
-        "incoming_luma_knots": {
-            "q10": float(incoming["luma_q10"]),
-            "mean": float(incoming["luma_mean"]),
-            "q90": float(incoming["luma_q90"]),
-        },
-        "luma_delta": {
-            "q10": float(delta["luma_q10"]),
-            "mean": float(delta["luma_mean"]),
-            "q90": float(delta["luma_q90"]),
-        },
-        "saturation_factor": round(saturation_factor, 6),
-        "u_shift": round(u_shift, 6),
-        "v_shift": round(v_shift, 6),
-    }
-
-
-def _repair_is_safe(plan: dict[str, Any], config: dict[str, Any]) -> bool:
-    limits = config["safe_limits"]
-    luma = plan["luma_delta"]
-    return all(
-        (
-            abs(float(luma["mean"])) <= float(limits["mean_luma_delta"]),
-            abs(float(luma["q10"])) <= float(limits["quantile_luma_delta"]),
-            abs(float(luma["q90"])) <= float(limits["quantile_luma_delta"]),
-            float(limits["minimum_saturation_factor"])
-            <= float(plan["saturation_factor"])
-            <= float(limits["maximum_saturation_factor"]),
-            abs(float(plan["u_shift"])) <= float(limits["maximum_chroma_shift"]),
-            abs(float(plan["v_shift"])) <= float(limits["maximum_chroma_shift"]),
-        )
-    )
-
-
-def triage_boundary(
-    boundary: dict[str, Any],
-    metrics: dict[str, Any],
-    config: dict[str, Any],
-) -> tuple[str, str, dict[str, Any] | None]:
-    """Return technical routing only, never a semantic approval decision."""
-    if boundary.get("transition_class") in COLOR_MATCH_EXCLUDED_BOUNDARY_CLASSES:
-        return (
-            "authored_transition_evidence_only",
-            "Authored transition or scene change is not eligible for automatic color matching.",
-            None,
-        )
-    if boundary.get("picture_edit") not in AUTOMATIC_COLOR_MATCH_PICTURE_EDIT_MODES:
-        return (
-            "non_cut_evidence_only",
-            "Only a hard cut can receive an automatic boundary color correction.",
-            None,
-        )
-    similarity = float(metrics["luma_shape_correlation"])
-    minimum = float(config["analysis"]["minimum_match_similarity"])
-    if similarity < minimum:
-        return (
-            "authored_cut_no_auto_match",
-            "The two sides are not a high-confidence visual match; color difference may be authored.",
-            None,
-        )
-    if not _has_detectable_mismatch(metrics, config):
-        return (
-            "no_technical_correction_needed",
-            "High-confidence visual match is already inside the technical detection thresholds.",
-            None,
-        )
-    plan = build_repair_plan(metrics, config)
-    if not _repair_is_safe(plan, config):
-        return (
-            "review_required",
-            "The matched boundary exceeds the narrow automatic color-repair limits.",
-            plan,
-        )
-    if not config["auto_apply_safe_color_match"]:
-        return (
-            "repair_candidate_review_required",
-            "A safe correction candidate exists, but automatic application is disabled.",
-            plan,
-        )
-    return (
-        "safe_color_match_planned",
-        "A high-confidence matched cut has a small correctable luma/chroma discrepancy.",
-        plan,
-    )
-
-
-def _piecewise_luma_expression(plan: dict[str, Any], strength: float) -> str:
-    knots = plan["incoming_luma_knots"]
-    x1 = max(1.0, min(252.0, float(knots["q10"])))
-    x2 = max(x1 + 1.0, min(253.0, float(knots["mean"])))
-    x3 = max(x2 + 1.0, min(254.0, float(knots["q90"])))
-    delta = plan["luma_delta"]
-    d1 = float(delta["q10"]) * strength
-    d2 = float(delta["mean"]) * strength
-    d3 = float(delta["q90"]) * strength
-    expression = (
-        f"if(lt(val,{x1:.6f}),val+({d1:.6f})*val/{x1:.6f},"
-        f"if(lt(val,{x2:.6f}),val+({d1:.6f})+"
-        f"(({d2:.6f})-({d1:.6f}))*(val-{x1:.6f})/{x2 - x1:.6f},"
-        f"if(lt(val,{x3:.6f}),val+({d2:.6f})+"
-        f"(({d3:.6f})-({d2:.6f}))*(val-{x2:.6f})/{x3 - x2:.6f},"
-        f"val+({d3:.6f})*(255-val)/{255.0 - x3:.6f})))"
-    )
-    return f"clip({expression},0,255)"
-
-
-def repair_lut_filter(plan: dict[str, Any], *, strength: float = 1.0) -> str:
-    saturation = 1.0 + (float(plan["saturation_factor"]) - 1.0) * strength
-    u_shift = float(plan["u_shift"]) * strength
-    v_shift = float(plan["v_shift"]) * strength
-    y_expression = _piecewise_luma_expression(plan, strength)
-    u_expression = f"clip(128+(val-128)*{saturation:.6f}+({u_shift:.6f}),0,255)"
-    v_expression = f"clip(128+(val-128)*{saturation:.6f}+({v_shift:.6f}),0,255)"
-    return (
-        f"lutyuv=y='{y_expression}':u='{u_expression}':v='{v_expression}'"
-    )
-
-
-def append_segment_repair_filter(
-    filters: list[str],
-    *,
-    input_label: str,
-    output_label: str,
-    label_prefix: str,
-    plan: dict[str, Any],
-) -> None:
-    """Append a boundary-local correction that decays from the Segment opening."""
-    original = f"{label_prefix}original"
-    grade_input = f"{label_prefix}gradeinput"
-    graded = f"{label_prefix}graded"
-    fade = float(plan["fade_seconds"])
-    filters.append(f"[{input_label}]split=2[{original}][{grade_input}]")
-    filters.append(f"[{grade_input}]{repair_lut_filter(plan)}[{graded}]")
-    blend = f"max(0,min(1,({fade:.6f}-T)/{fade:.6f}))"
-    filters.append(
-        f"[{original}][{graded}]blend=all_expr='A+(B-A)*{blend}'[{output_label}]"
-    )

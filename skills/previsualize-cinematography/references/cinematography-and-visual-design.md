@@ -77,12 +77,19 @@ medium-close frame. Keep the world coherent through screen direction, eye lines,
 foreground edges, sound perspective, recurring anchors, and motivated
 re-establishing—not by keeping the whole cast and set continuously visible.
 
-Use a medium-wide, wide, or extreme-wide frame only when the audience must read
-new geography, scale, full-body mechanics, entrance/exit travel, or a changed
-spatial relationship. State the exact information the wider frame adds. Once that
-information is established, move closer rather than repeatedly reopening the set.
-A Scene opening, Segment boundary, dialogue exchange, or continuity check is not
-by itself a reason to go wide.
+Keep the visible frame to one story-active subject or one speaker/listener pair
+whenever possible. Other physically present roles remain continuous outside the
+crop; their existence is not a composition requirement.
+
+Use a medium-wide, wide, or extreme-wide frame only as a
+`position-change exception:` while the audience must read a story-required
+entrance, exit, crossing, approach, retreat, transfer between marks, or other
+consequential relocation. State the start mark, path, landing mark, changed
+relationship, and tight subject that follows. Keep only the shortest readable
+movement interval, never place two wider Shots consecutively, and return directly
+to ECU/CU/MCU. New geography, scale, atmosphere, full-cast presence, a Scene
+opening, Segment boundary, dialogue exchange, continuity check, or visual variety
+is not by itself a reason to go wide.
 
 Reject proscenium coverage: frontal all-cast rows, semicircles that take turns
 speaking, centered performers addressing the camera, or repeated master shots that
@@ -91,6 +98,11 @@ asymmetric blocking, foreground/background separation, singles, reaction
 close-ups, inserts, POV, and off-screen sound. A direct cut between a wide and a
 close-up is valid when action, eye line, composition, or sound makes the
 relationship legible; an intermediate size is not mandatory.
+
+Before interaction coverage, state the axis line, each principal's mark, screen
+side and opposed look direction, plus the camera side of the axis. Preserve that
+contract through singles, OTS, reactions, and reverses. Cross only through a
+visible neutral move or a motivated re-establishment.
 
 ## Lens and camera placement
 

@@ -145,10 +145,16 @@ For voice-over, specify that no visible character lip-syncs unless the shot inte
 
 For three or more characters:
 
-- Establish positions and eyeline groups before singles.
+- Record all positions and eyeline groups before singles; this spatial contract
+  does not require an on-screen full-cast master.
 - Assign each line to one ID and one target or group.
 - Keep silent characters on distinct listening tasks; do not animate every face equally.
-- Use a master or subgroup two-shot to preserve geography.
+- Show only the current speaker/listener pair or decisive reaction. Use a subgroup
+  two-shot only when their shared action cannot read tighter.
+- A brief wider frame is allowed only while a story-required character enters,
+  exits, crosses, approaches, retreats, transfers marks, or otherwise changes
+  consequential position; label it `position-change exception:` and return tight
+  on landing.
 - Avoid rapid round-robin dialogue inside one generation segment.
 - Split simultaneous reactions by dramatic priority: primary, secondary, background.
 

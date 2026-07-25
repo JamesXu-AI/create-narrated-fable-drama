@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -217,6 +218,64 @@ def _existing_assets(
             "assets.json must be the exact final production-design-assets contract"
         )
     return catalog["assets"]
+
+
+def _catalog_visual_paths(assets: dict[str, Any]) -> set[str]:
+    """Return every catalog-owned visual path without classifying semantics."""
+
+    paths: set[str] = set()
+    for record in assets.values():
+        if not isinstance(record, dict):
+            continue
+        visual = record.get("visual")
+        if isinstance(visual, dict) and isinstance(visual.get("path"), str):
+            paths.add(visual["path"])
+        if record.get("type") != "ensemble_roster":
+            continue
+        members = record.get("members")
+        if not isinstance(members, list):
+            continue
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            roster_asset = member.get("roster_asset")
+            if isinstance(roster_asset, dict) and isinstance(
+                roster_asset.get("path"), str
+            ):
+                paths.add(roster_asset["path"])
+    return paths
+
+
+def _uncatalogued_exact_path_matches(
+    root: Path,
+    jobs: list[dict[str, Any]],
+    *,
+    repository_root: Path | None = None,
+) -> list[dict[str, str]]:
+    """Expose planned media already present in the library but absent from its catalog."""
+
+    asset_repository_root = _asset_repository_root(root, repository_root)
+    catalog_paths = _catalog_visual_paths(
+        _existing_assets(root, repository_root=asset_repository_root)
+    )
+    matches: list[dict[str, str]] = []
+    for job in jobs:
+        relative_path = job["relative_path"].as_posix()
+        if (
+            relative_path not in catalog_paths
+            and (asset_repository_root / relative_path).is_file()
+        ):
+            matches.append(
+                {
+                    "target_asset_id": job["asset_id"],
+                    "asset_type": job["kind"],
+                    "existing_media_path": relative_path,
+                    "required_catalog_path": (
+                        ASSET_CATALOG_RELATIVE_PATH.as_posix()
+                    ),
+                }
+            )
+    return matches
 
 
 def _semantic_reuse_review(
@@ -641,16 +700,45 @@ def build_task(
         force_regenerate=force_regenerate | set(codex_accept_generated),
         repository_root=REPOSITORY_ROOT,
     )
+    uncatalogued_exact_path_matches = _uncatalogued_exact_path_matches(
+        root,
+        jobs,
+        repository_root=REPOSITORY_ROOT,
+    )
     if inspect_semantic_reuse:
         return {
-            "status": "REVIEW_REQUIRED" if review else "PASS",
-            "review_authority": "codex_direct_semantic_judgment",
+            "status": (
+                "REVIEW_REQUIRED"
+                if review or uncatalogued_exact_path_matches
+                else "PASS"
+            ),
+            "review_authority": (
+                "codex_asset_library_recovery"
+                if uncatalogued_exact_path_matches
+                else "codex_direct_semantic_judgment"
+            ),
             "review_prompt": (
                 "direct-production-design/references/"
                 "asset-semantic-reuse-review.md"
             ),
+            "asset_library_root": ASSET_MEDIA_RELATIVE_PATH.as_posix(),
+            "asset_catalog_path": ASSET_CATALOG_RELATIVE_PATH.as_posix(),
+            "uncatalogued_exact_path_matches": (
+                uncatalogued_exact_path_matches
+            ),
             "candidates": review,
         }
+    if uncatalogued_exact_path_matches:
+        details = ", ".join(
+            f"{item['target_asset_id']}={item['existing_media_path']}"
+            for item in uncatalogued_exact_path_matches
+        )
+        raise InitialProductionDesignError(
+            "Asset-library recovery required before generation. Planned visual "
+            "media already exists under workspace/assets but is absent from "
+            f"workspace/assets/assets.json: {details}. Recover and validate its "
+            "catalog semantics and provider URI; do not regenerate or overwrite it."
+        )
     _require_codex_semantic_decisions(
         review,
         codex_reuse=codex_reuse,

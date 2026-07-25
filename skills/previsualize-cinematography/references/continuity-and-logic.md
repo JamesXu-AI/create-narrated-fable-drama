@@ -61,7 +61,9 @@ replay unless it clearly restages the authored beat.
 
 ## Spatial and shot/reverse-shot continuity
 
-Establish location, doors, furniture, exits, hazards, characters, and axis before complex coverage. Preserve:
+Establish location, doors, furniture, exits, hazards, characters, and axis in the
+spatial contract before complex coverage; this does not require an on-screen wide
+master. Preserve:
 
 - A/B screen sides and look directions.
 - 180-degree axis, neutral axis point, and camera side.

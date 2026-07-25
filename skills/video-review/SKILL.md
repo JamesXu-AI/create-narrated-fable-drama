@@ -25,6 +25,13 @@ For scripts and Storyboards, check:
   continuity, and ambience bridge;
 - positive image omission when an established storyteller is voice-only and
   visually absent.
+- each Shot uses the fewest story-active visible characters, normally one subject
+  or one speaker/listener pair, without decorative bystanders or default
+  full-cast staging;
+- every interaction names a stable eyeline axis, A/B screen sides, opposed look
+  directions, and camera side;
+- ECU/CU/MCU dominate, and every MWS/WS/EWS is a labeled, shortest-readable
+  position-change exception followed by a tight Shot.
 
 For generated video, watch the full clip at normal speed with sound. Check:
 
@@ -41,6 +48,14 @@ For generated video, watch the full clip at normal speed with sound. Check:
   ambience remain continuous where the story requires;
 - camera, action, internal cuts, effects, native music, safe ending, and external
   seam are usable;
+- the frame is not crowded with unnecessary characters; cropped but present roles
+  remain spatially credible without forcing a full-cast master;
+- speaker/listener gaze, screen-left/right assignment, reverse angle, and camera
+  side preserve the authored eyeline axis, with no same-direction look or silent
+  axis flip;
+- close-ups remain the dominant experience; any wider interval exists only long
+  enough to read the authored entrance, exit, crossing, approach, retreat,
+  mark-transfer, or other consequential position change, then returns tight;
 - no paraphrase, missing/extra words, clipped speech, voice mismatch, text,
   captions, logo, watermark, anatomy defect, or extension replay appears.
 
@@ -55,6 +70,10 @@ speaker ownership, emotional beat, prop ownership, identity, and next-state
 continuity remain clear. Reject variance that breaks a causal gate, phrase handoff,
 mouth state, voice continuity, exact line, action completion, geography, or
 reachable successor state.
+Do not tolerate decorative extra characters, an ambiguous/reversed interaction
+axis, a wide view without a required position change, a wider interval that holds
+past its movement landing, or a result whose dramatic coverage is not primarily
+ECU/CU/MCU.
 
 ## Output
 

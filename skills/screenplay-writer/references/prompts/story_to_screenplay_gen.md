@@ -91,10 +91,31 @@ Each Scene has an objective, obstacle, tactic progression, spatial progression,
 important reaction, turn, outcome, and exit impulse. Each Shot has a visible start,
 action, reaction, and changed landing.
 
-Use attention-led coverage. Tight views own decisive faces, eyes, breath, hands,
-clues, reactions, wounds, and story-bearing details. Use a wide view only when the
-audience needs new geography, full-body mechanics, entrance/exit travel, scale, or
-a changed spatial relationship.
+Apply one non-negotiable visual grammar to the whole screenplay:
+
+1. **Few visible characters.** Keep the active frame to the minimum
+   story-required performer set, normally one character or one speaker/listener
+   pair. Preserve physically present cropped characters in lifecycle tables; do
+   not crowd the Shot to prove they still exist. Do not invent decorative
+   bystanders or full-cast reaction rows.
+2. **Explicit eyeline axis.** For every interaction, write concrete marks,
+   opposing facing/look directions, and addressee gaze so downstream direction can
+   lock A/B screen sides and one camera side of the axis. The camera is never the
+   addressee.
+3. **Close-up-led coverage.** `close_up`, `extreme_close_up`, `reaction`, `insert`,
+   and `pov` own speech, listening, recognition, hesitation, decision, emotion,
+   breath, hands/paws, clues, wounds, and other story-bearing detail. Use `medium`
+   only when a small shared action or two-person relationship cannot read tighter.
+4. **One narrow widening exception.** `establishing` or `wide` is legal only for
+   the shortest readable beat of a story-required entrance, exit, crossing,
+   approach, retreat, handoff between marks, or other consequential position
+   change. Prefix `Blocking / Movement` with `position-change exception:` and
+   identify the start mark, path, landing mark, and the tight attention target
+   that follows.
+
+A Scene opening, new Segment, attractive environment, scale, atmosphere, number of
+characters physically present, continuity proof, or desire for visual variety does
+not justify a wider view.
 
 ### Timing and sound
 
@@ -148,4 +169,6 @@ Release only when:
 7. all entrances, exits, gaze, action, sound, duration, and boundaries are
    reachable; and
 8. the complete screenplay reads naturally aloud in the target language; and
-9. the full screenplay speech-rate gate passes every Line before release.
+9. the few-character, eyeline-axis, close-up-led grammar is explicit, tight views
+   dominate, and every wide view carries a concrete position-change exception; and
+10. the full screenplay speech-rate gate passes every Line before release.

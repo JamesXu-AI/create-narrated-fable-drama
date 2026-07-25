@@ -1,4 +1,4 @@
 interface:
   display_name: "Narrated Fable Video Review"
   short_description: "检查对白、角色旁白、画面与声音衔接"
-  default_prompt: "Use $video-review to watch the complete narrated-drama or fable Segment with sound, verify exact speaker and wording, natural on-camera/off-camera storyteller handoffs, correct mouth behavior, voice and ambience continuity, and return NO_ISSUES or concise owner-routed corrections."
+  default_prompt: "Use $video-review to watch the complete narrated-drama or fable Segment with sound, verify the fewest necessary visible characters, stable A/B eyeline axis and screen directions, ECU/CU/MCU dominance, and that every wider interval only covers the shortest authored position change before returning tight, alongside exact speech, mouth, voice, ambience, continuity, and then return NO_ISSUES or concise owner-routed corrections."

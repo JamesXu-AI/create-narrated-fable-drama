@@ -108,8 +108,11 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
                 "generate_audio": True,
             },
             "audio_timeline": str(audio_timeline_path.resolve()),
+            "model_repair_plan": boundary_qc.get("model_repair_plan"),
+            "finish_evidence_manifest": boundary_qc.get("evidence_manifest"),
             "boundary_qc": {
                 "manifest": str(boundary_qc_path.resolve()),
+                "decision_authority": boundary_qc.get("decision_authority"),
                 "pre_assembly_status": boundary_qc["pre_assembly_status"],
                 "final_timeline_status": boundary_qc["final_timeline_status"],
                 "planned_repair_count": boundary_qc.get(

@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .qc_metrics import repair_lut_filter
 from .qc_policy import BoundaryQCError, _run
 
 
@@ -43,15 +42,10 @@ def _render_strict_sample(
         str(Path(getattr(incoming, "video_path"))),
     ]
     filters: list[str] = []
-    picture_edit = str(boundary.get("picture_edit"))
-    overlap = float(boundary.get("overlap_seconds") or 0.0)
-    outgoing_source_out = float(
-        boundary.get(
-            "outgoing_source_out_seconds",
-            getattr(outgoing_probe, "duration_seconds"),
-        )
-    )
-    incoming_source_in = float(boundary.get("incoming_source_in_seconds") or 0.0)
+    picture_edit = str(boundary["picture_edit"])
+    overlap = float(boundary["overlap_seconds"])
+    outgoing_source_out = float(boundary["outgoing_source_out_seconds"])
+    incoming_source_in = float(boundary["incoming_source_in_seconds"])
     if picture_edit in {"dissolve", "fade"}:
         handle = 1.0 + overlap / 2.0
         outgoing_start = max(0.0, outgoing_source_out - handle)
@@ -210,97 +204,6 @@ def _extract_frame_evidence(
         "frames_directory": str(frames_dir.resolve()),
         "frame_count": frame_count,
     }
-
-
-def _render_repaired_sample(
-    source: Path,
-    output: Path,
-    plan: dict[str, Any],
-    *,
-    strength: float,
-) -> None:
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fade = float(plan["fade_seconds"])
-    correction_end = 1.0 + fade
-    weight = (
-        f"if(gte(T,1.000000),"
-        f"max(0,min(1,({correction_end:.6f}-T)/{fade:.6f})),0)"
-    )
-    filters = (
-        "[0:v]split=2[original][gradeinput];"
-        f"[gradeinput]{repair_lut_filter(plan, strength=strength)}[graded];"
-        f"[original][graded]blend=all_expr='A+(B-A)*{weight}'[vout]"
-    )
-    _run(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(source),
-            "-filter_complex",
-            filters,
-            "-map",
-            "[vout]",
-            "-map",
-            "0:a:0?",
-            "-frames:v",
-            "48",
-            "-t",
-            "2.000000",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "20",
-            "-c:a",
-            "copy",
-            "-movflags",
-            "+faststart",
-            str(output),
-        ],
-        label="Boundary repair candidate render",
-    )
-
-
-def _render_comparison(original: Path, repaired: Path, output: Path) -> None:
-    _run(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(original),
-            "-i",
-            str(repaired),
-            "-filter_complex",
-            "[0:v]scale=960:-2[left];[1:v]scale=960:-2[right];"
-            "[left][right]hstack=inputs=2[vout]",
-            "-map",
-            "[vout]",
-            "-map",
-            "0:a:0?",
-            "-t",
-            "2.000000",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "20",
-            "-c:a",
-            "copy",
-            "-movflags",
-            "+faststart",
-            str(output),
-        ],
-        label="Original/repaired boundary comparison render",
-    )
 
 
 def _matches_selected(boundary: dict[str, Any], selected: str | None) -> bool:

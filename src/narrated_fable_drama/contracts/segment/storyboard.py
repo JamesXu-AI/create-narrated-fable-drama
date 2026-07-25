@@ -32,6 +32,10 @@ from narrated_fable_drama.core.speech_rate import (
     require_speech_rate,
 )
 
+TIGHT_SHOT_SIZES = {"extreme_close_up", "close_up", "medium_close_up"}
+WIDE_EXCEPTION_SHOT_SIZES = {"medium_wide", "wide", "extreme_wide"}
+POSITION_CHANGE_EXCEPTION_PREFIX = "position-change exception:"
+
 
 def _field_table(section: str, heading: str) -> dict[str, str]:
     headers, rows = table_after_heading(
@@ -264,6 +268,7 @@ def storyboard_segment_rows(
     if list(location_by_segment) != expected:
         raise SegmentRuntimeError("Location State Plan must cover every Segment in order")
     rows: list[dict[str, Any]] = []
+    ordered_visual_grammar: list[tuple[str, str, str]] = []
     wave_by_id: dict[str, int] = {}
     source_hash = sha256_file(storyboard.path)
     for generation in generation_rows:
@@ -298,6 +303,20 @@ def storyboard_segment_rows(
         wave_by_id[segment_id] = planned_wave
         section = sections[segment_id]
         direction = _field_table(section, "### Segment Direction")
+        for field in (
+            "Visible Character Economy",
+            "Eyeline Axis and Screen Direction",
+        ):
+            if not direction.get(field, "").strip():
+                raise SegmentRuntimeError(f"{segment_id} lacks {field}")
+        axis_value = direction["Eyeline Axis and Screen Direction"]
+        if not re.search(r"\baxis\b", axis_value, re.I) or not re.search(
+            r"\bscreen(?:-| )?(?:left|right|direction)\b", axis_value, re.I
+        ):
+            raise SegmentRuntimeError(
+                f"{segment_id} eyeline direction must name the axis and a "
+                "screen side/direction"
+            )
         shot_headers, ordered_rows = storyboard.table(
             "### Ordered Shots",
             section=section,
@@ -307,6 +326,19 @@ def storyboard_segment_rows(
             raise SegmentRuntimeError(
                 f"{segment_id} Ordered Shots differ from Generation Plan"
             )
+        for shot in ordered_rows:
+            shot_size = shot[2]
+            ordered_visual_grammar.append((segment_id, shot[0], shot_size))
+            if (
+                shot_size in WIDE_EXCEPTION_SHOT_SIZES
+                and not shot[5].casefold().startswith(
+                    POSITION_CHANGE_EXCEPTION_PREFIX
+                )
+            ):
+                raise SegmentRuntimeError(
+                    f"{segment_id} {shot[0]} wider framing lacks the literal "
+                    "position-change exception"
+                )
         bindings = _reference_bindings(root, segment_id, section)
         location = location_by_segment[segment_id]
         relationship = location[2]
@@ -355,9 +387,22 @@ def storyboard_segment_rows(
             "operation_instruction_en": operation,
             "global_constraints_en": (
                 f"16:9; visual style exactly {project_context['visual_style']}; "
+                "fewest story-active visible characters; preserve the declared "
+                "eyeline axis and screen directions; close-up-led coverage with "
+                "wider framing only for a labeled position-change exception; "
                 "preserve exact speakers, voice identity, mouth behavior, "
                 "natural speech transitions, references, continuity, and native audio; "
                 "no generated subtitles or on-screen text."
+            ),
+            "visible_character_economy_en": direction.get(
+                "Visible Character Economy", ""
+            ),
+            "eyeline_axis_and_screen_direction_en": direction.get(
+                "Eyeline Axis and Screen Direction", ""
+            ),
+            "shot_size_policy": (
+                "ECU/CU/MCU dominate; MWS/WS/EWS only for the shortest labeled "
+                "position-change exception followed by a tight Shot."
             ),
             "reference_priority_order": [
                 item["provider_token"]
@@ -430,7 +475,6 @@ def storyboard_segment_rows(
             "prompt_contract": prompt_contract,
             "bindings": bindings,
             "dialogue_cues": dialogue_cues,
-            "editable_hold_seconds": 0.25,
             "final_visible_state": direction.get(
                 "Outgoing State", ordered_rows[-1][9]
             ),
@@ -438,6 +482,28 @@ def storyboard_segment_rows(
             "ordered_shots": ordered_rows,
         }
         rows.append(row)
+    for index, (segment_id, shot_label, shot_size) in enumerate(
+        ordered_visual_grammar[:-1]
+    ):
+        if (
+            shot_size in WIDE_EXCEPTION_SHOT_SIZES
+            and ordered_visual_grammar[index + 1][2] not in TIGHT_SHOT_SIZES
+        ):
+            raise SegmentRuntimeError(
+                f"{segment_id} {shot_label} position-change exception must return "
+                "directly to ECU/CU/MCU"
+            )
+    tight_count = sum(
+        shot_size in TIGHT_SHOT_SIZES
+        for _, _, shot_size in ordered_visual_grammar
+    )
+    if (
+        len(ordered_visual_grammar) >= 2
+        and tight_count <= len(ordered_visual_grammar) - tight_count
+    ):
+        raise SegmentRuntimeError(
+            "ECU/CU/MCU Shots must outnumber all other Storyboard Shot sizes"
+        )
     if validation_through_segment_id is not None:
         ids = [row["segment_id"] for row in rows]
         if validation_through_segment_id not in ids:
@@ -446,4 +512,3 @@ def storyboard_segment_rows(
             )
         rows = rows[: ids.index(validation_through_segment_id) + 1]
     return rows
-

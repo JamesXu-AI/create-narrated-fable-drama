@@ -69,6 +69,9 @@ The reference ceiling never authorizes an upstream visibility downgrade. Preserv
 every screenplay-required individual and ensemble in its required Shots. Reduce
 simultaneous motion, split the Generation Segment at a motivated boundary, or bind
 an approved closed-roster group asset instead of moving required roles off-screen.
+Within those obligations, keep each actual frame to the minimum story-active
+subjects—normally one subject or one speaker/listener pair—and carry still-present
+cropped roles through explicit off-screen state rather than a full-cast master.
 
 ## Write the temporal layer as ordered Shots
 
@@ -78,6 +81,13 @@ Use readable `Shot N:` sections in event order. Each Shot communicates:
 - the active subject's visible action and expression;
 - position, spatial change, gaze, and listener reaction; and
 - synchronized dialogue, sound effects, ambience, and silence.
+
+ECU/CU/MCU is the baseline and must dominate. Before any interaction Shot, preserve
+the Storyboard's A/B screen sides, opposed look directions, axis line, and camera
+side. A medium-wide/wide/extreme-wide Shot must carry the literal label
+`position-change exception:` and only cover the shortest readable
+entrance/exit/crossing/approach/retreat/mark-transfer interval before returning
+tight.
 
 Prefer event order and natural rhythm to exact provider-facing ranges such as
 `0-3 seconds`; precise ranges are unstable and are rejected from the model-facing
@@ -129,6 +139,8 @@ prohibit:
 - logos and watermarks;
 - duplicate people, clones, twin-like copies, and repeated instances of one
   subject; and
+- decorative bystanders, unauthorized full-cast composition, ambiguous or
+  reversed eyelines, and unmotivated widening; and
 - style, identity, anatomy, costume/state, population, or continuity drift.
 
 Use the approved visual style explicitly. If source media visibly conflicts with
@@ -166,5 +178,7 @@ Inspect for identity drift, an unapproved celebrity-like face, unexpected text,
 subtitle, logo, watermark, style drift, duplicate subject, wrong performer count,
 missing/extra limb, unstable high-energy action, extension jump or replay,
 progressive extension degradation, incorrect effect logic, clipped terminal audio,
-mispronunciation, and voice mismatch. Route each problem to the owning department;
-never hide a generation defect in postproduction.
+mispronunciation, voice mismatch, crowded staging, axis reversal, insufficient
+close-up dominance, and a wide Shot that does not cover a required position
+change. Route each problem to the owning department; never hide a generation defect
+in postproduction.

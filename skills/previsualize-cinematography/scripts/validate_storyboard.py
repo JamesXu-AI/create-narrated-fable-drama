@@ -61,6 +61,12 @@ STRONG_RESET_SHOT_SIZES = {
     "close_up",
     "medium_close_up",
 }
+WIDE_EXCEPTION_SHOT_SIZES = {
+    "medium_wide",
+    "wide",
+    "extreme_wide",
+}
+POSITION_CHANGE_EXCEPTION_PREFIX = "position-change exception:"
 STRONG_RESET_CAMERA_RE = re.compile(
     r"\b(?:new|changed|reverse|opposite|low|high|top-down|ground-level|profile|"
     r"over-the-shoulder|pov)\b.{0,40}\b(?:angle|viewpoint|composition|camera|side)\b|"
@@ -74,7 +80,6 @@ TIGHT_SCREENPLAY_SCALE_TO_STORYBOARD_SIZES = {
     "extreme_close_up": {"extreme_close_up"},
     "insert": {"close_up", "extreme_close_up"},
     "reaction": {
-        "medium",
         "medium_close_up",
         "close_up",
         "extreme_close_up",
@@ -181,6 +186,16 @@ def _validate_project_direction(text: str, context: dict[str, object]) -> None:
         if values.get(field) != value:
             raise StoryboardValidationError(
                 f"Project Direction {field} differs from screenplay.md"
+            )
+    for field in (
+        "Visible Character Economy",
+        "Eyeline Axis Grammar",
+        "Shot Size and Intimacy Grammar",
+    ):
+        value = values.get(field, "").strip()
+        if not value or value.casefold() in {"none", "tbd", "same"}:
+            raise StoryboardValidationError(
+                f"Project Direction lacks concrete {field}"
             )
 
 
@@ -523,7 +538,7 @@ def _ordered_shot_map(text: str) -> dict[str, dict[str, set[str]]]:
 
 
 def _validate_shot_size_authority(task_dir: Path, storyboard_text: str) -> dict[str, int]:
-    """Require explicit sizes and prevent widening screenplay-owned tight views."""
+    """Require close-up dominance and narrow, labeled position-change exceptions."""
 
     screenplay_path = task_dir / "screenplay-writer/screenplay.md"
     if not screenplay_path.is_file():
@@ -532,6 +547,7 @@ def _validate_shot_size_authority(task_dir: Path, storyboard_text: str) -> dict[
         screenplay_path.read_text(encoding="utf-8")
     )
     size_counts = {size: 0 for size in sorted(STORYBOARD_SHOT_SIZES)}
+    ordered_sizes: list[tuple[str, str, str]] = []
     matches = list(SEGMENT_HEADING_RE.finditer(storyboard_text))
     for index, match in enumerate(matches):
         segment_id = f"segment-{int(match.group(1)):03d}"
@@ -549,6 +565,18 @@ def _validate_shot_size_authority(task_dir: Path, storyboard_text: str) -> dict[
         for row in rows:
             storyboard_size = row[2]
             size_counts[storyboard_size] += 1
+            ordered_sizes.append((segment_id, row[0], storyboard_size))
+            if (
+                storyboard_size in WIDE_EXCEPTION_SHOT_SIZES
+                and not row[5].casefold().startswith(
+                    POSITION_CHANGE_EXCEPTION_PREFIX
+                )
+            ):
+                raise StoryboardValidationError(
+                    f"{segment_id} {row[0]} {storyboard_size} must prefix "
+                    "Space, Blocking and Gaze with "
+                    "'position-change exception:'"
+                )
             screenplay_ids = re.findall(r"A-[0-9]{3,}", row[1])
             for screenplay_id in screenplay_ids:
                 screenplay_scale = screenplay_scales.get(screenplay_id)
@@ -560,6 +588,23 @@ def _validate_shot_size_authority(task_dir: Path, storyboard_text: str) -> dict[
                         f"{segment_id} {row[0]} widens screenplay "
                         f"{screenplay_id} {screenplay_scale} to {storyboard_size}"
                     )
+    for index, (segment_id, shot_label, shot_size) in enumerate(ordered_sizes[:-1]):
+        if (
+            shot_size in WIDE_EXCEPTION_SHOT_SIZES
+            and ordered_sizes[index + 1][2] not in STRONG_RESET_SHOT_SIZES
+        ):
+            raise StoryboardValidationError(
+                f"{segment_id} {shot_label} position-change exception must return "
+                "directly to extreme_close_up, close_up, or medium_close_up"
+            )
+    tight_count = sum(
+        size_counts[size] for size in STRONG_RESET_SHOT_SIZES
+    )
+    total_count = sum(size_counts.values())
+    if total_count >= 2 and tight_count <= total_count - tight_count:
+        raise StoryboardValidationError(
+            "ECU/CU/MCU Shots must outnumber all other Storyboard Shot sizes"
+        )
     return {key: value for key, value in size_counts.items() if value}
 
 
@@ -836,6 +881,7 @@ def validate_storyboard(task_dir: Path) -> dict:
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else positions[-1]
         section = text[match.end():end]
+        segment_id = f"segment-{numbers[index]:03d}"
         sub_positions = [section.find(heading) for heading in REQUIRED_SEGMENT_SUBHEADINGS]
         if any(position < 0 for position in sub_positions) or sub_positions != sorted(sub_positions):
             raise StoryboardValidationError(
@@ -848,6 +894,8 @@ def validate_storyboard(task_dir: Path) -> dict:
             "Authorized Population",
             "Character Segment States",
             "Required Presence Locks",
+            "Visible Character Economy",
+            "Eyeline Axis and Screen Direction",
             "Persistent Anchors",
             "Anchor Visibility Requirement",
             "Coverage Reset Requirement",
@@ -856,7 +904,22 @@ def validate_storyboard(task_dir: Path) -> dict:
                 raise StoryboardValidationError(
                     f"Generation Segment {numbers[index]} lacks {field}"
                 )
-        segment_id = f"segment-{numbers[index]:03d}"
+        direction_headers, direction_rows = _table_after_heading(
+            section, "### Segment Direction"
+        )
+        if direction_headers != ["Field", "Value"]:
+            raise StoryboardValidationError(
+                f"{segment_id} Segment Direction must use Field | Value"
+            )
+        direction = {row[0]: row[1] for row in direction_rows}
+        axis_value = direction["Eyeline Axis and Screen Direction"]
+        if not re.search(r"\baxis\b", axis_value, re.I) or not re.search(
+            r"\bscreen(?:-| )?(?:left|right|direction)\b", axis_value, re.I
+        ):
+            raise StoryboardValidationError(
+                f"{segment_id} Eyeline Axis and Screen Direction must name the "
+                "axis and a screen side/direction"
+            )
         reset_match = re.search(
             r"^\|\s*Coverage Reset Requirement\s*\|\s*(.+?)\s*\|\s*$",
             section,

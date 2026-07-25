@@ -38,24 +38,17 @@ def _positive_number(value: object, *, label: str) -> float:
 
 
 def load_config(path: Path = DEFAULT_CONFIG) -> dict[str, Any]:
-    """Load and validate the narrow automatic-repair policy."""
+    """Load and validate deterministic evidence-rendering settings."""
     config = _load_json(path.expanduser().resolve(), label="boundary QC config")
-    if config.get("contract") != "finish-boundary-qc-config/v1":
+    if config.get("contract") != "finish-boundary-qc-evidence-config/v2":
         raise BoundaryQCError("Unsupported boundary QC config contract")
-    for key in ("enabled", "auto_apply_safe_color_match"):
-        if not isinstance(config.get(key), bool):
-            raise BoundaryQCError(f"boundary QC config {key} must be boolean")
+    if not isinstance(config.get("enabled"), bool):
+        raise BoundaryQCError("boundary QC config enabled must be boolean")
     strict = config.get("strict_sample")
     analysis = config.get("analysis")
-    detection = config.get("detection")
-    limits = config.get("safe_limits")
-    repair = config.get("repair")
     for label, value in (
         ("strict_sample", strict),
         ("analysis", analysis),
-        ("detection", detection),
-        ("safe_limits", limits),
-        ("repair", repair),
     ):
         if not isinstance(value, dict):
             raise BoundaryQCError(f"boundary QC config {label} must be an object")
@@ -70,30 +63,6 @@ def load_config(path: Path = DEFAULT_CONFIG) -> dict[str, Any]:
     _positive_number(strict.get("evidence_frame_width"), label="evidence_frame_width")
     _positive_number(analysis.get("width"), label="analysis.width")
     _positive_number(analysis.get("anchor_frame_count"), label="anchor_frame_count")
-    similarity = _positive_number(
-        analysis.get("minimum_match_similarity"),
-        label="minimum_match_similarity",
-    )
-    if similarity > 1:
-        raise BoundaryQCError("minimum_match_similarity cannot exceed 1")
-    for key, value in detection.items():
-        _positive_number(value, label=f"detection.{key}")
-    for key, value in limits.items():
-        _positive_number(value, label=f"safe_limits.{key}")
-    if float(limits["minimum_saturation_factor"]) >= float(
-        limits["maximum_saturation_factor"]
-    ):
-        raise BoundaryQCError("Saturation factor limits are reversed")
-    _positive_number(repair.get("fade_seconds"), label="repair.fade_seconds")
-    strengths = repair.get("candidate_strengths")
-    if not isinstance(strengths, dict) or set(strengths) != {
-        "soft",
-        "matched",
-        "strong",
-    }:
-        raise BoundaryQCError("candidate_strengths must define soft/matched/strong")
-    for key, value in strengths.items():
-        _positive_number(value, label=f"candidate_strengths.{key}")
     return config
 
 
@@ -106,4 +75,3 @@ def _run(command: list[str], *, label: str) -> None:
         run(command, context=label)
     except MediaCommandError as exc:
         raise BoundaryQCError(f"{label} failed") from exc
-

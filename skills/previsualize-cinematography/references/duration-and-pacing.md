@@ -106,7 +106,7 @@ Do not append all allowances to every line. Routine exchanges share rhythm; deci
 | Prop handoff | `1.5–3.0s` | Show contact, transfer, and new owner |
 | Small-room approach | `2.0–4.0s` | Depends on distance and obstruction |
 | Readable push, pull, or lateral move | `2.0–5.0s` | Shorter motion may read as a jolt |
-| Axis re-establishing master | `1.0–2.5s` | Must restore geography clearly |
+| Tight neutral-axis re-establishing Shot | `1.0–2.5s` | Restore A/B screen sides and opposed looks without widening unless a position change is also occurring |
 | Short edge-to-mark entrance or exit | `1.5–3.5s` | Include boundary contact, traversal, and weight settle |
 | Progressive reveal/concealment | `1.0–3.0s` | Depends on required partial states and occluder |
 | Complex emotional turn plus line | `3.0–7.0s+` | Split when reaction is the story |

@@ -45,14 +45,48 @@ The target country is mandatory. If it is missing from the conversation, stop an
 ask for it before screenplay authoring. Style and resolution use their defaults
 when absent.
 
+## Project-wide visual doctrine
+
+Apply this doctrine from screenplay through final review:
+
+```text
+few visible characters -> explicit eyeline axis -> close-up-led coverage ->
+brief widening only for a story-required position change -> immediate return to
+the tight dramatic subject
+```
+
+- Keep the visible composition economical. A Shot normally isolates one
+  story-active character or a two-character speaker/listener relationship. Do not
+  add decorative characters, gather the full cast, or keep every physically
+  present role in frame merely to prove continuity. Cropped roles remain
+  physically present and are carried by screen direction, gaze, foreground edge,
+  off-screen sound, or a later reaction.
+- Before any interaction coverage, state the eyeline axis, each principal's
+  screen side and look direction, and the camera side of the axis. Preserve those
+  facts through singles, over-shoulders, reactions, and reverses. Cross the axis
+  only through a visible neutral move or a motivated re-establishment.
+- `extreme_close_up`, `close_up`, and `medium_close_up` are the baseline and must
+  dominate the finished coverage. `medium` is secondary and exists only when a
+  small shared action or two-person relation cannot read tighter.
+- `medium_wide`, `wide`, and `extreme_wide` are exceptions. Use one only while the
+  audience must see a story-required entrance, exit, crossing, approach, retreat,
+  transfer between marks, or other consequential position change. Keep it to the
+  shortest readable beat and return immediately to the decisive face, eyes,
+  mouth, hand/paw, clue, or reaction.
+- A new Scene, a new Segment, scenic atmosphere, scale, the existence of a
+  Location, several characters being present, or a desire for “cinematic variety”
+  never independently justifies widening.
+
 ## Three full release gates
 
 1. After screenplay generation, validate the complete screenplay and every exact
    line against its owning Shot duration.
-2. After Storyboard generation, validate the complete Storyboard and every exact
-   line against its Segment-local speech window.
+2. After Storyboard generation, validate the complete Storyboard, few-character
+   composition, eyeline axes, close-up dominance, all position-change exceptions,
+   and every exact line against its Segment-local speech window.
 3. After all first-pass Segment Prompts are authored, validate the complete Prompt
-   set, references, exact speech, and all speech windows again.
+   set, copied visual-doctrine declarations, exact per-Shot sizes, references,
+   exact speech, and all speech windows again.
 
 The shared maximum is 4.0 CJK characters per second or 2.6 non-CJK words per
 second, plus 0.25 seconds of line start/end allowance. Failure blocks downstream
@@ -150,7 +184,8 @@ reference requirements conflict.
   needs to perform the speech, picture, sound, and transition.
 - `video-review` watches picture and sound and rejects unnatural speech
   switches, voice drift, wrong mouth movement, unwanted storyteller appearances,
-  missing reactions, or abrupt ambience changes.
+  missing reactions, crowded or full-cast staging, ambiguous/reversed eyelines,
+  unearned wide coverage, or abrupt ambience changes.
 - `finish-postproduction` assembles accepted native audiovisual Segments, executes
   authored J/L audio bridges and transitions, and builds exact captions.
 
@@ -165,6 +200,9 @@ Release a phase only when:
 5. framing and embedded worlds have separate visual-population authority;
 6. every Seedance Prompt contains the Storyboard's exact speech, speaker,
    visibility, mouth, reaction, audio-bridge, and exclusion instructions;
-7. adjacent Segments preserve character, prop, environment, voice, and ambience
+7. every interaction declares a stable eyeline axis, tight Shots dominate, and
+   every wider Shot is the shortest readable coverage of a story-required
+   position change;
+8. adjacent Segments preserve character, prop, environment, voice, and ambience
    state without replay or unexplained reset; and
-8. generated video has been reviewed with sound before acceptance.
+9. generated video has been reviewed with sound before acceptance.

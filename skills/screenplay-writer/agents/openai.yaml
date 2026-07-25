@@ -1,4 +1,4 @@
 interface:
   display_name: "AI Fable Screenplay Writer"
   short_description: "Write exact 16:9 narrated drama screenplays"
-  default_prompt: "Use $screenplay-writer to adapt my Story for the mandatory target country and conversational style/resolution, keeping character storytellers natural and requiring a full per-Line speech-rate PASS before release."
+  default_prompt: "Use $screenplay-writer to adapt my Story for the mandatory target country and conversational style/resolution, keep each Shot to the fewest story-active characters, author concrete addressee gaze and blocking for a stable eyeline axis, make close-up/reaction/detail views dominant, permit wide views only as marked shortest position-change exceptions followed by a tight Shot, keep character storytellers natural, and require all release gates to pass."

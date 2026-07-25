@@ -179,17 +179,22 @@ The default grammar is attention-led and intimate:
 
 - `close_up`, `extreme_close_up`, `reaction`, `insert`, and `pov` isolate the face,
   eye line, breath, wound, active body part, clue, or story-critical detail that owns
-  the beat;
-- `medium` supports readable shared action or dialogue after geography is known;
-- `establishing` and `wide` are exceptional spatial tools for newly required
-  geography, scale, full-body mechanics, entrances/exits, or changed relationships.
+  the beat and must dominate the screenplay;
+- `medium` is secondary and supports only a small shared action or two-person
+  relation that cannot read in a tighter view;
+- `establishing` and `wide` are position-change exceptions only. They may cover
+  the shortest readable portion of a story-required entrance, exit, crossing,
+  approach, retreat, transfer between marks, or other consequential relocation.
 
 Do not use `establishing` or `wide` as an automatic Scene opener, continuity proof,
-or frontal all-cast dialogue master. Do not author three consecutive
-`establishing`/`wide` rows. Every Scene with three or more Shot rows contains at
-least one `close_up`, `extreme_close_up`, `reaction`, `insert`, or `pov` row.
-This deterministic floor prevents stage-tableau coverage; it is not a maximum on
-tight Shots and not a requirement to cut mechanically.
+scenic/scale reveal, atmosphere beat, or frontal all-cast dialogue master. Every
+`establishing`/`wide` row prefixes `Blocking / Movement` with
+`position-change exception:` and names the start mark, path, landing mark, and
+consequential relationship change. Do not author consecutive
+`establishing`/`wide` rows. The next Shot returns to
+`close_up`/`extreme_close_up`/`reaction`/`insert`/`pov` on the decisive face,
+eyes, hand/paw, clue, or reaction. Across the complete screenplay, those tight
+attention views outnumber `medium`, `establishing`, and `wide` combined.
 
 #### Performers, action, reaction, and movement
 
@@ -205,6 +210,10 @@ tight Shots and not a requirement to cut mechanically.
 - `Blocking / Movement` states origins, destinations, screen-space relationships,
   crossings, stops, turns, and resulting positions. `none` is valid only for a
   truly static object/environment shot.
+- A Shot normally names one visible dramatic subject or one speaker/listener pair.
+  Additional physically present roles remain continuous through gaze, foreground
+  edge, off-screen sound, or later reaction rather than forcing a full-cast frame.
+  Any larger visible group must be indispensable to the current causal action.
 
 #### Gaze / Addressee
 
@@ -219,6 +228,9 @@ Write each relation exactly as
 Separate multiple relations with `<br>`. The camera is never an addressee.
 For O.S./V.O. dialogue use `not_visible` facing/gaze language. The dialogue
 speaker's target here is the authoritative addressee for that Line.
+Across interactive Shot rows, preserve opposed look directions that can compile to
+one stable A/B eyeline axis. Do not alternate screen direction, mirror marks, or
+silently cross the axis.
 
 #### Completion State
 

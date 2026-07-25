@@ -79,15 +79,10 @@ def load_segment_handoff(task_dir: Path) -> dict[str, dict[str, Any]]:
                     "dialogue_cues": [normalized],
                 }
             )
-        editable_hold = _number(
-            plan.get("editable_hold_seconds"), f"{segment_id} editable hold"
-        )
         final_visible = plan.get("final_visible_state")
         final_sound = plan.get("final_sound_state")
         if (
-            editable_hold < 0
-            or editable_hold > duration
-            or not isinstance(final_visible, str)
+            not isinstance(final_visible, str)
             or not final_visible.strip()
             or not isinstance(final_sound, str)
             or not final_sound.strip()
@@ -98,7 +93,6 @@ def load_segment_handoff(task_dir: Path) -> dict[str, dict[str, Any]]:
             "duration_seconds": duration,
             "timeline_blocks": blocks,
             "segment_safe_cut_design": {
-                "editable_hold_seconds": editable_hold,
                 "final_visible_state_en": final_visible,
                 "final_sound_state_en": final_sound,
             },

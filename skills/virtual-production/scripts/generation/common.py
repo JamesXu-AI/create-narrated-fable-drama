@@ -21,7 +21,7 @@ PROVIDER_ATTEMPTS_DIRNAME = "provider-attempts"
 ACTIVE_ATTEMPT_DIRNAME = "active"
 EXECUTION_LOCK_FILENAME = "generation.lock"
 TERMINAL_STATES = {"succeeded", "failed", "cancelled", "expired"}
-MAX_PROVIDER_ATTEMPTS = 3
+MAX_WHITE_MODEL_RESET_ATTEMPTS = 3
 FAILED_ATTEMPT_RE = re.compile(r"^attempt-([0-9]{4})-failed$")
 PRINT_LOCK = threading.Lock()
 
@@ -45,4 +45,3 @@ def read_json(path: Path) -> dict[str, Any]:
         label="JSON",
         error_type=SegmentGenerationError,
     )
-

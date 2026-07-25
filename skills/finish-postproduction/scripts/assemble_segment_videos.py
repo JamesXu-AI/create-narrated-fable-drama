@@ -4,13 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 import sys
 from typing import Any
 
-
-SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 
 from post_timeline import (
     MAX_FINAL_RUNTIME_SECONDS,
@@ -23,11 +20,16 @@ from post_timeline import (
 )
 from boundary.qc import (
     BoundaryQCError,
-    append_segment_repair_filter,
     audit_picture_lock,
     prepare_boundary_qc,
 )
+from finishing.plan import (
+    RepairPlanError,
+    ensure_renderable,
+    load_repair_plan,
+)
 from narrated_fable_drama.core.project_context import load_project_context
+from narrated_fable_drama.core.json_io import write_json_atomic
 from narrated_fable_drama.media.ffmpeg import (
     MediaCommandError,
     run as run_media_command,
@@ -60,95 +62,270 @@ def _delivery_dimensions(
     return width, height
 
 
+def _event_source_ranges(
+    event: dict[str, Any],
+    *,
+    segment_id: str,
+    media: str,
+    source_duration: float,
+) -> list[tuple[float, float]]:
+    raw = event.get("source_ranges")
+    if not isinstance(raw, list) or not raw:
+        raise TimelineError(f"{segment_id} lacks explicit {media} source ranges")
+    ranges: list[tuple[float, float]] = []
+    prior_end = -1.0
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise TimelineError(
+                f"{segment_id} {media} source range {index + 1} is invalid"
+            )
+        source_in = float(item["source_in_seconds"])
+        source_out = float(item["source_out_seconds"])
+        if (
+            source_in < 0
+            or source_out <= source_in
+            or source_out > source_duration + 1e-3
+            or source_in < prior_end - 1e-6
+        ):
+            raise TimelineError(
+                f"{segment_id} {media} source ranges are invalid"
+            )
+        ranges.append((source_in, source_out))
+        prior_end = source_out
+    return ranges
+
+
 def _render_filter(
     records: list[SegmentRecord],
     width: int,
     height: int,
-    boundaries: list[dict[str, Any]],
-    repair_plans: dict[str, dict[str, Any]] | None = None,
-    picture_events: list[dict[str, Any]] | None = None,
+    picture_edl: dict[str, Any],
+    audio_timeline: dict[str, Any],
+    delivery: dict[str, Any],
 ) -> str:
+    boundaries = picture_edl["boundaries"]
+    picture_events = picture_edl["picture_events"]
     if len(boundaries) != max(0, len(records) - 1):
         raise TimelineError("Rendered boundary coverage differs from Segment coverage")
     frame_rate = records[0].probe.frame_rate
+    sample_rate = int(delivery["sample_rate_hz"])
+    channel_layout = str(delivery["channel_layout"])
     filters: list[str] = []
-    repair_plans = repair_plans or {}
-    if picture_events is None:
-        picture_events = [
-            {
-                "segment_id": record.segment_name,
-                "source_in_seconds": 0.0,
-                "source_out_seconds": record.probe.duration_seconds,
-                "duration_seconds": record.probe.duration_seconds,
-            }
-            for record in records
-        ]
     if [item.get("segment_id") for item in picture_events] != [
         record.segment_name for record in records
     ]:
         raise TimelineError("Picture-event coverage differs from Segment coverage")
+    tracks = audio_timeline.get("tracks")
+    if (
+        not isinstance(tracks, list)
+        or len(tracks) != 1
+        or not isinstance(tracks[0], dict)
+        or not isinstance(tracks[0].get("events"), list)
+    ):
+        raise TimelineError("Audio timeline must contain one explicit native track")
+    native_events = tracks[0]["events"]
+    if [item.get("segment_id") for item in native_events] != [
+        record.segment_name for record in records
+    ]:
+        raise TimelineError("Native-audio event coverage differs from Segment coverage")
+    bridges = audio_timeline.get("audio_bridges")
+    if not isinstance(bridges, list):
+        raise TimelineError("Audio timeline lacks explicit audio_bridges")
+    record_index_by_id = {
+        record.segment_name: index for index, record in enumerate(records)
+    }
+    picture_ranges_by_id = {
+        record.segment_name: _event_source_ranges(
+            picture_events[index],
+            segment_id=record.segment_name,
+            media="picture",
+            source_duration=record.probe.duration_seconds,
+        )
+        for index, record in enumerate(records)
+    }
+    audio_ranges_by_id = {
+        record.segment_name: _event_source_ranges(
+            native_events[index],
+            segment_id=record.segment_name,
+            media="audio",
+            source_duration=record.probe.duration_seconds,
+        )
+        for index, record in enumerate(records)
+    }
+    video_source_labels: dict[str, list[str]] = {}
+    for record in records:
+        count = len(picture_ranges_by_id[record.segment_name])
+        index = record_index_by_id[record.segment_name]
+        if count == 1:
+            video_source_labels[record.segment_name] = [f"{index}:v:0"]
+            continue
+        labels = [
+            f"vsource{index}_{consumer_index}"
+            for consumer_index in range(count)
+        ]
+        filters.append(
+            f"[{index}:v:0]split={count}"
+            + "".join(f"[{label}]" for label in labels)
+        )
+        video_source_labels[record.segment_name] = labels
+    audio_use_count = {
+        record.segment_name: len(audio_ranges_by_id[record.segment_name])
+        for record in records
+    }
+    for bridge in bridges:
+        source_segment_id = str(bridge["source_segment_id"])
+        if source_segment_id not in audio_use_count:
+            raise TimelineError("Audio bridge references an unknown Segment")
+        audio_use_count[source_segment_id] += 1
+    audio_source_labels: dict[str, list[str]] = {}
+    for record in records:
+        count = audio_use_count[record.segment_name]
+        index = record_index_by_id[record.segment_name]
+        if count == 1:
+            audio_source_labels[record.segment_name] = [f"{index}:a:0"]
+            continue
+        labels = [
+            f"asource{index}_{consumer_index}"
+            for consumer_index in range(count)
+        ]
+        filters.append(
+            f"[{index}:a:0]asplit={count}"
+            + "".join(f"[{label}]" for label in labels)
+        )
+        audio_source_labels[record.segment_name] = labels
     rendered_durations: list[float] = []
     for index, record in enumerate(records):
         event = picture_events[index]
-        source_in = float(event["source_in_seconds"])
-        source_out = float(event["source_out_seconds"])
-        duration = source_out - source_in
-        if source_in < 0 or source_out > record.probe.duration_seconds + 1e-3 or duration <= 0:
-            raise TimelineError(f"{record.segment_name} has an invalid EDL source window")
+        picture_ranges = picture_ranges_by_id[record.segment_name]
+        duration = sum(source_out - source_in for source_in, source_out in picture_ranges)
         rendered_durations.append(duration)
         if not record.probe.has_audio:
             raise TimelineError(f"{record.segment_name} has no Seedance native audio")
-        repair_plan = repair_plans.get(record.segment_name)
-        base_video_label = f"vbase{index}" if repair_plan is not None else f"v{index}"
-        filters.append(
-            f"[{index}:v:0]trim=start={source_in:.6f}:end={source_out:.6f},"
-            "setpts=PTS-STARTPTS,"
-            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
-            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
-            f"setsar=1,fps={frame_rate},format=yuv420p,settb=AVTB[{base_video_label}]"
+        color_adjustments = event.get("color_adjustments")
+        if not isinstance(color_adjustments, list):
+            raise TimelineError(
+                f"{record.segment_name} lacks explicit color adjustments"
+            )
+        video_part_labels: list[str] = []
+        for range_index, (source_in, source_out) in enumerate(picture_ranges):
+            video_filters = [
+                f"trim=start={source_in:.6f}:end={source_out:.6f}",
+                "setpts=PTS-STARTPTS",
+                f"scale={width}:{height}:force_original_aspect_ratio=decrease",
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black",
+                "setsar=1",
+                f"fps={frame_rate}",
+                f"format={delivery['pixel_format']}",
+                "settb=AVTB",
+            ]
+            for adjustment in color_adjustments:
+                adjustment_start = float(adjustment["source_start_seconds"])
+                adjustment_end = float(adjustment["source_end_seconds"])
+                if (
+                    adjustment_start < source_in - 1e-6
+                    or adjustment_end > source_out + 1e-6
+                ):
+                    continue
+                local_start = adjustment_start - source_in
+                local_end = adjustment_end - source_in
+                video_filters.append(
+                    "eq="
+                    f"brightness={float(adjustment['brightness']):.6f}:"
+                    f"contrast={float(adjustment['contrast']):.6f}:"
+                    f"saturation={float(adjustment['saturation']):.6f}:"
+                    f"gamma={float(adjustment['gamma']):.6f}:"
+                    f"enable='between(t,{local_start:.6f},{local_end:.6f})'"
+                )
+            part_label = f"vpart{index}_{range_index}"
+            source_label = video_source_labels[record.segment_name].pop(0)
+            filters.append(
+                f"[{source_label}]{','.join(video_filters)}[{part_label}]"
+            )
+            video_part_labels.append(part_label)
+        if len(video_part_labels) == 1:
+            filters.append(f"[{video_part_labels[0]}]null[v{index}]")
+        else:
+            filters.append(
+                "".join(f"[{label}]" for label in video_part_labels)
+                + f"concat=n={len(video_part_labels)}:v=1:a=0[v{index}]"
+            )
+
+        audio_event = native_events[index]
+        audio_ranges = audio_ranges_by_id[record.segment_name]
+        audio_duration = sum(
+            source_out - source_in for source_in, source_out in audio_ranges
         )
-        if repair_plan is not None:
-            append_segment_repair_filter(
-                filters,
-                input_label=base_video_label,
-                output_label=f"v{index}",
-                label_prefix=f"repair{index}",
-                plan=repair_plan,
+        gain_adjustments = audio_event.get("gain_adjustments")
+        if not isinstance(gain_adjustments, list):
+            raise TimelineError(
+                f"{record.segment_name} lacks explicit local gain adjustments"
+            )
+        audio_part_labels: list[str] = []
+        for range_index, (source_in, source_out) in enumerate(audio_ranges):
+            part_filters = [
+                f"atrim=start={source_in:.6f}:end={source_out:.6f}",
+                "asetpts=PTS-STARTPTS",
+                f"aresample={sample_rate}",
+                (
+                    "aformat=sample_fmts=fltp:"
+                    f"sample_rates={sample_rate}:channel_layouts={channel_layout}"
+                ),
+            ]
+            for adjustment in gain_adjustments:
+                adjustment_start = float(adjustment["source_start_seconds"])
+                adjustment_end = float(adjustment["source_end_seconds"])
+                if (
+                    adjustment_start < source_in - 1e-6
+                    or adjustment_end > source_out + 1e-6
+                ):
+                    continue
+                local_start = adjustment_start - source_in
+                local_end = adjustment_end - source_in
+                part_filters.append(
+                    f"volume={float(adjustment['gain_db']):.6f}dB:"
+                    f"enable='between(t,{local_start:.6f},{local_end:.6f})'"
+                )
+            part_label = f"apart{index}_{range_index}"
+            source_label = audio_source_labels[record.segment_name].pop(0)
+            filters.append(
+                f"[{source_label}]{','.join(part_filters)}[{part_label}]"
+            )
+            audio_part_labels.append(part_label)
+        audio_base_label = f"abase{index}"
+        if len(audio_part_labels) == 1:
+            filters.append(
+                f"[{audio_part_labels[0]}]anull[{audio_base_label}]"
+            )
+        else:
+            filters.append(
+                "".join(f"[{label}]" for label in audio_part_labels)
+                + f"concat=n={len(audio_part_labels)}:v=0:a=1"
+                f"[{audio_base_label}]"
             )
         audio_filters = [
-            f"atrim=start={source_in:.6f}:end={source_out:.6f}",
-            "aresample=48000",
-            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo",
-            f"apad=pad_dur={duration:.6f}",
-            f"atrim=duration={duration:.6f}",
-            "asetpts=PTS-STARTPTS",
+            f"volume={float(audio_event['gain_db']):.6f}dB",
         ]
-        incoming = boundaries[index - 1] if index else None
-        outgoing = boundaries[index] if index < len(boundaries) else None
-        if incoming and incoming["audio_edit"] == "native_continuity_declick":
-            fade = float(incoming["audio_edge_fade_seconds"])
-            audio_filters.append(f"afade=t=in:st=0:d={fade:.6f}")
-        if outgoing and outgoing["audio_edit"] == "native_continuity_declick":
-            fade = float(outgoing["audio_edge_fade_seconds"])
+        fade_in = float(audio_event["fade_in_seconds"])
+        fade_out = float(audio_event["fade_out_seconds"])
+        if fade_in > 0:
+            audio_filters.append(f"afade=t=in:st=0:d={fade_in:.6f}")
+        if fade_out > 0:
             audio_filters.append(
-                f"afade=t=out:st={max(0.0, duration - fade):.6f}:d={fade:.6f}"
+                f"afade=t=out:st={audio_duration - fade_out:.6f}:d={fade_out:.6f}"
             )
-        if index == len(records) - 1:
-            terminal_fade = min(0.12, duration)
-            audio_filters.append(
-                f"afade=t=out:st={max(0.0, duration - terminal_fade):.6f}:"
-                f"d={terminal_fade:.6f}"
-            )
-        filters.append(f"[{index}:a:0]{','.join(audio_filters)}[a{index}]")
+        delay = float(audio_event["timeline_in_seconds"])
+        if delay > 0:
+            delay_samples = round(delay * sample_rate)
+            audio_filters.append(f"adelay={delay_samples}S:all=1")
+        filters.append(
+            f"[{audio_base_label}]{','.join(audio_filters)}[a{index}]"
+        )
 
     current_video = "v0"
-    current_audio = "a0"
     current_duration = rendered_durations[0]
     for index, boundary in enumerate(boundaries, start=1):
         next_video = f"v{index}"
-        next_audio = f"a{index}"
         output_video = f"vjoin{index}"
-        output_audio = f"ajoin{index}"
         picture_edit = boundary["picture_edit"]
         overlap = float(boundary["overlap_seconds"])
         if picture_edit in {"dissolve", "fade"}:
@@ -164,10 +341,6 @@ def _render_filter(
                 f"[{current_video}][{next_video}]xfade=transition={transition}:"
                 f"duration={overlap:.6f}:offset={offset:.6f}[{output_video}]"
             )
-            filters.append(
-                f"[{current_audio}][{next_audio}]acrossfade=d={overlap:.6f}:"
-                f"c1=qsin:c2=qsin[{output_audio}]"
-            )
             current_duration += rendered_durations[index] - overlap
         elif picture_edit in {"hard_cut", "baked_effect"}:
             if overlap != 0:
@@ -177,16 +350,72 @@ def _render_filter(
             filters.append(
                 f"[{current_video}][{next_video}]concat=n=2:v=1:a=0[{output_video}]"
             )
-            filters.append(
-                f"[{current_audio}][{next_audio}]concat=n=2:v=0:a=1[{output_audio}]"
-            )
             current_duration += rendered_durations[index]
         else:
             raise TimelineError(f"Unsupported picture edit: {picture_edit}")
         current_video = output_video
-        current_audio = output_audio
     filters.append(f"[{current_video}]null[vout]")
-    filters.append(f"[{current_audio}]anull[aout]")
+
+    audio_labels = [f"a{index}" for index in range(len(native_events))]
+    for bridge_index, bridge in enumerate(bridges):
+        source_in = float(bridge["source_in_seconds"])
+        source_out = float(bridge["source_out_seconds"])
+        bridge_duration = source_out - source_in
+        bridge_filters = [
+            f"atrim=start={source_in:.6f}:end={source_out:.6f}",
+            "asetpts=PTS-STARTPTS",
+            f"aresample={sample_rate}",
+            (
+                "aformat=sample_fmts=fltp:"
+                f"sample_rates={sample_rate}:channel_layouts={channel_layout}"
+            ),
+            f"volume={float(bridge['gain_db']):.6f}dB",
+        ]
+        fade_in = float(bridge["fade_in_seconds"])
+        fade_out = float(bridge["fade_out_seconds"])
+        if fade_in > 0:
+            bridge_filters.append(f"afade=t=in:st=0:d={fade_in:.6f}")
+        if fade_out > 0:
+            bridge_filters.append(
+                f"afade=t=out:st={bridge_duration - fade_out:.6f}:d={fade_out:.6f}"
+            )
+        timeline_in = float(bridge["timeline_in_seconds"])
+        if timeline_in > 0:
+            bridge_filters.append(
+                f"adelay={round(timeline_in * sample_rate)}S:all=1"
+            )
+        label = f"abridge{bridge_index}"
+        source_audio_label = audio_source_labels[
+            str(bridge["source_segment_id"])
+        ].pop(0)
+        filters.append(
+            f"[{source_audio_label}]{','.join(bridge_filters)}[{label}]"
+        )
+        audio_labels.append(label)
+
+    if len(audio_labels) == 1:
+        filters.append(f"[{audio_labels[0]}]anull[amixed]")
+    else:
+        joined = "".join(f"[{label}]" for label in audio_labels)
+        filters.append(
+            f"{joined}amix=inputs={len(audio_labels)}:"
+            "duration=longest:normalize=0[amixed]"
+        )
+    total_duration = float(picture_edl["duration_seconds"])
+    final_audio_filters = [
+        f"atrim=start=0:end={total_duration:.6f}",
+        "asetpts=PTS-STARTPTS",
+    ]
+    terminal = audio_timeline["native_audio_policy"]["terminal_audio"]
+    terminal_fade = float(terminal["fade_out_seconds"])
+    if terminal_fade > total_duration:
+        raise TimelineError("Explicit terminal audio fade exceeds final runtime")
+    if terminal_fade > 0:
+        final_audio_filters.append(
+            f"afade=t=out:st={total_duration - terminal_fade:.6f}:"
+            f"d={terminal_fade:.6f}"
+        )
+    filters.append(f"[amixed]{','.join(final_audio_filters)}[aout]")
     return ";".join(filters)
 
 
@@ -195,7 +424,10 @@ def render_picture_lock(
     output: Path,
     project_context: dict[str, Any],
     picture_edl: dict[str, Any],
-    repair_plans: dict[str, dict[str, Any]] | None = None,
+    audio_timeline: dict[str, Any],
+    repair_plan: dict[str, Any],
+    *,
+    timeline_window: tuple[float, float] | None = None,
 ) -> None:
     width, height = _delivery_dimensions(project_context, records[0])
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
@@ -208,24 +440,44 @@ def render_picture_lock(
                 records,
                 width,
                 height,
-                picture_edl["boundaries"],
-                repair_plans,
-                picture_events=picture_edl["picture_events"],
+                picture_edl,
+                audio_timeline,
+                repair_plan["delivery"],
             ),
             "-map",
             "[vout]",
             "-map",
             "[aout]",
+        ]
+    )
+    if timeline_window is not None:
+        window_start, window_end = timeline_window
+        if window_start < 0 or window_end <= window_start:
+            raise TimelineError("Candidate timeline window is invalid")
+        command.extend(
+            [
+                "-ss",
+                f"{window_start:.6f}",
+                "-t",
+                f"{window_end - window_start:.6f}",
+            ]
+        )
+    command.extend(
+        [
             "-c:v",
-            "libx264",
+            str(repair_plan["delivery"]["video_codec"]),
             "-preset",
-            "medium",
+            str(repair_plan["delivery"]["preset"]),
             "-crf",
-            "18",
+            str(repair_plan["delivery"]["crf"]),
+            "-pix_fmt",
+            str(repair_plan["delivery"]["pixel_format"]),
             "-c:a",
-            "aac",
+            str(repair_plan["delivery"]["audio_codec"]),
             "-b:a",
-            "192k",
+            str(repair_plan["delivery"]["audio_bitrate"]),
+            "-ar",
+            str(repair_plan["delivery"]["sample_rate_hz"]),
             "-movflags",
             "+faststart",
             str(output),
@@ -237,10 +489,26 @@ def render_picture_lock(
         raise TimelineError("Picture-lock render failed") from exc
 
 
-def assemble(task_dir: Path, *, edl_only: bool = False) -> Path:
+def assemble(
+    task_dir: Path,
+    *,
+    repair_plan_path: Path,
+    evidence_manifest_path: Path,
+    edl_only: bool = False,
+) -> Path:
     task_dir = task_dir.expanduser().resolve()
     records = discover_segments(task_dir)
-    picture_edl, audio_timeline = compile_timelines(task_dir, records)
+    repair_plan = load_repair_plan(
+        repair_plan_path,
+        evidence_manifest_path,
+        records,
+    )
+    ensure_renderable(repair_plan)
+    picture_edl, audio_timeline = compile_timelines(
+        task_dir,
+        repair_plan,
+        records,
+    )
     output = (
         task_dir
         / ".pending"
@@ -251,13 +519,43 @@ def assemble(task_dir: Path, *, edl_only: bool = False) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
     if not edl_only:
         try:
-            qc_manifest_path, repair_plans, qc_manifest = prepare_boundary_qc(
+            qc_manifest_path, _, qc_manifest = prepare_boundary_qc(
                 task_dir,
                 records,
                 picture_edl,
             )
         except BoundaryQCError as exc:
             raise TimelineError(f"Boundary QC preparation failed: {exc}") from exc
+        model_boundary_by_id = {
+            str(item["boundary_id"]): item
+            for item in repair_plan["boundaries"]
+        }
+        for item in qc_manifest["boundaries"]:
+            model_boundary = model_boundary_by_id[str(item["boundary_id"])]
+            item["model_decision"] = {
+                "decision": model_boundary["decision"],
+                "scope": model_boundary["scope"],
+                "picture": model_boundary["picture"],
+                "audio": model_boundary["audio"],
+                "reason": model_boundary["reason"],
+            }
+        model_repair_count = sum(
+            item["decision"] == "repair"
+            for item in repair_plan["boundaries"]
+        )
+        qc_manifest.update(
+            {
+                "decision_authority": "editor-restoration-master-model",
+                "model_repair_plan": str(
+                    repair_plan_path.expanduser().resolve()
+                ),
+                "evidence_manifest": str(
+                    evidence_manifest_path.expanduser().resolve()
+                ),
+                "planned_repair_count": model_repair_count,
+            }
+        )
+        write_json_atomic(qc_manifest_path, qc_manifest, sort_keys=True)
         if qc_manifest.get("pre_assembly_status") == "review_required":
             blockers = ", ".join(qc_manifest.get("blocking_boundaries", []))
             raise TimelineError(
@@ -268,7 +566,8 @@ def assemble(task_dir: Path, *, edl_only: bool = False) -> Path:
             output,
             load_project_context(task_dir),
             picture_edl,
-            repair_plans,
+            audio_timeline,
+            repair_plan,
         )
         rendered = probe_media(output)
         expected = float(picture_edl["duration_seconds"])
@@ -288,9 +587,15 @@ def assemble(task_dir: Path, *, edl_only: bool = False) -> Path:
                 "audio_stream_present": True,
                 "boundary_qc": {
                     "manifest": str(qc_manifest_path.resolve()),
-                    "planned_repair_count": len(repair_plans),
+                    "planned_repair_count": model_repair_count,
                     "source_segments_mutated": False,
                 },
+                "model_repair_plan": str(
+                    repair_plan_path.expanduser().resolve()
+                ),
+                "evidence_manifest": str(
+                    evidence_manifest_path.expanduser().resolve()
+                ),
             }
         )
         try:
@@ -326,11 +631,20 @@ def assemble(task_dir: Path, *, edl_only: bool = False) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-dir", required=True, type=Path)
+    parser.add_argument("--repair-plan", required=True, type=Path)
+    parser.add_argument("--evidence-manifest", required=True, type=Path)
     parser.add_argument("--edl-only", action="store_true")
     args = parser.parse_args()
     try:
-        print(assemble(args.task_dir, edl_only=args.edl_only))
-    except (TimelineError, MediaCommandError) as exc:
+        print(
+            assemble(
+                args.task_dir,
+                repair_plan_path=args.repair_plan,
+                evidence_manifest_path=args.evidence_manifest,
+                edl_only=args.edl_only,
+            )
+        )
+    except (TimelineError, RepairPlanError, MediaCommandError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0

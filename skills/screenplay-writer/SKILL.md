@@ -45,6 +45,27 @@ framing/embedded-world separation, sound events, timing, and continuity.
 Do not choose asset IDs, appearance design, detailed cinematography, provider
 parameters, Storyboard implementation, or Seedance Prompt wording.
 
+## Visual writing doctrine
+
+Write for few-character, explicit-axis, close-up-led execution:
+
+- retain every story-required character, but keep each Shot's active visible
+  performers to the minimum needed for its dramatic change—normally one character
+  or one speaker/listener pair;
+- do not invent decorative bystanders, gather the cast into a frontal master, or
+  mark every physically present character `visible_every_shot`; a crop is not an
+  exit;
+- for every interaction, make `Gaze / Addressee` and `Blocking / Movement`
+  sufficient for cinematography to lock A/B screen sides, opposed look directions,
+  marks, and a stable eyeline axis;
+- default `Scale / View` to `close_up`, `extreme_close_up`, `reaction`, `insert`,
+  or `pov`; use `medium` only for an indispensable small shared action; and
+- use `establishing` or `wide` only for the shortest beat that must show a
+  story-required entrance, exit, crossing, approach, retreat, transfer between
+  marks, or other consequential position change. Prefix its `Blocking / Movement`
+  with `position-change exception:` and return the next dramatic attention to a
+  tight view.
+
 ## Storyteller rules
 
 Do not assume an external narrator. A character may speak on camera and continue as
@@ -91,7 +112,8 @@ needing the same positive character image both present and absent.
    who truly owns narration.
 5. Separate framing and embedded story locations and population.
 6. Author Scene-wide character lifecycles before Shot rows. A crop is not an exit.
-7. Write only Shots that create or reveal a dramatic change.
+7. Write only Shots that create or reveal a dramatic change, using the
+   few-character, explicit-axis, close-up-led doctrine above.
 8. Give every spoken line a trigger, delivery mode, natural transition, exact text,
    listener response, and changed state.
 9. Use Continuity Boundary `Audio Handoff` cells to carry exact J/L cuts, breaths,
@@ -113,4 +135,5 @@ python3 skills/screenplay-writer/scripts/character_performance_map.py role-asset
 
 Release only after all checks pass and the screenplay has no filler, speaker
 confusion, voice reset, unmotivated overlap, narration mouth error, or unexplained
-world-state reset.
+world-state reset; no wide Shot lacks a position-change exception and tight
+attention remains the dominant coverage.

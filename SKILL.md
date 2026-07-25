@@ -74,6 +74,24 @@ Do not create companion creative ledgers for screenplay, Storyboard, narration,
 voice timing, Segment direction, compilation, or translation. Any runtime JSON is
 technical state only.
 
+## Project-wide visual doctrine
+
+Carry this unchanged through screenplay, Storyboard, every Seedance Prompt, video
+review, and final edit:
+
+- keep each frame to the fewest story-active characters, normally one subject or
+  one speaker/listener pair; never add decorative bystanders or default to a
+  full-cast composition;
+- declare the interaction eyeline axis, A/B screen sides and look directions, and
+  camera side before coverage; preserve them across reverses;
+- make ECU/CU/MCU the dominant grammar for speech, listening, recognition,
+  decision, emotion, and story-bearing detail;
+- widen only for the shortest readable part of a story-required entrance, exit,
+  crossing, approach, retreat, handoff between marks, or other consequential
+  position change, then cut directly back to tight attention; and
+- never widen merely to establish a Scene/Segment, show scenery or scale, prove
+  physical presence, include everyone, or add visual variety.
+
 ## Production order
 
 1. Require `story.md` and known target country.
@@ -81,16 +99,24 @@ technical state only.
    full speech-rate PASS with exact speech, delivery modes, natural transitions,
    and separate framing/embedded story worlds.
 3. Run the role/asset scope gate, then execute `direct-production-design`.
+   Before generating any visual, require its asset-library discovery gate to
+   inspect repository-root `workspace/assets/assets.json` and
+   `workspace/assets/`; a missing catalog ID never proves that media is absent.
 4. Execute `previsualize-cinematography`. Release only `storyboard.md` and require
-   its complete speech-window rate gate to pass.
+   its complete speech-window rate and close-up/eyeline visual-grammar gates to
+   pass.
 5. Execute `virtual-production`. Author every first-pass `segment-NNN.md` directly
    from the Storyboard, then require the complete Prompt-set and speech-rate gate
-   to pass; derive runtime transport in memory.
+   to pass, including copied visible-character economy, eyeline axis, per-Shot
+   size, close-up dominance, and every position-change exception; derive runtime
+   transport in memory.
 6. Begin the Segment human loop only now. Before every Seedance call, present the
    compact plan and wait for confirmation.
    One confirmation authorizes one attempt for one Segment.
 7. After every attempt, inspect the complete video with sound, report the result,
-   and wait for the user's accept/revise/retry/stop decision.
+   including visible-character economy, eyeline-axis continuity, close-up
+   dominance, and every position-change widening exception, then wait for the
+   user's accept/revise/retry/stop decision.
 8. After every Segment is individually accepted, present the assembly plan and
    wait for final-render confirmation.
 9. Execute `finish-postproduction` and wait for final human acceptance.

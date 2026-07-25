@@ -21,9 +21,10 @@ from narrated_fable_drama.providers import runtime as provider_runtime
 from narrated_fable_drama.providers import seedance
 from .common import (
     DEPARTMENT_DIRNAME,
-    MAX_PROVIDER_ATTEMPTS,
+    MAX_WHITE_MODEL_RESET_ATTEMPTS,
     PENDING_DIRNAME,
     REPOSITORY_ROOT,
+    TERMINAL_STATES,
     SegmentGenerationError,
     read_json,
     write_json,
@@ -201,7 +202,7 @@ def ensure_white_model_predecessor(
         "request_sha256": request_sha256,
     }
     failures: list[str] = []
-    for attempt_number in range(1, MAX_PROVIDER_ATTEMPTS + 1):
+    for attempt_number in range(1, MAX_WHITE_MODEL_RESET_ATTEMPTS + 1):
         attempt_dir = reset_root / f"attempt-{attempt_number:04d}"
         attempt_dir.mkdir(parents=True, exist_ok=True)
         output_video = attempt_dir / "video.mp4"
@@ -215,13 +216,6 @@ def ensure_white_model_predecessor(
                 f"{segment['generation_task_id']} cached white-model output is stale"
             )
 
-        failure_path = attempt_dir / "failure-record.json"
-        if failure_path.is_file():
-            failure = read_json(failure_path)
-            failures.append(
-                f"attempt {attempt_number}: {failure.get('provider_status', 'failed')}"
-            )
-            continue
         submission_path = attempt_dir / "submission.json"
         if submission_path.is_file():
             submission = read_json(submission_path)
@@ -235,6 +229,12 @@ def ensure_white_model_predecessor(
             task_id = submission.get("provider_task_id")
             if not isinstance(task_id, str) or not task_id:
                 raise SegmentGenerationError("White-model submission lacks a provider task ID")
+            previous_status = str(submission.get("status") or "")
+            if previous_status in (TERMINAL_STATES - {"succeeded"}) | {
+                "missing_video"
+            }:
+                failures.append(f"attempt {attempt_number}: {previous_status}")
+                continue
         else:
             try:
                 response = seedance.create_video_task(request, timeout=request_timeout)
@@ -266,17 +266,6 @@ def ensure_white_model_predecessor(
         write_json(submission_path, submission)
         if status != "succeeded":
             failures.append(f"attempt {attempt_number}: {status}")
-            write_json(
-                failure_path,
-                {
-                    "contract": "seedance-white-model-quality-reset-failure-v1",
-                    **expected_identity,
-                    "provider_task_id": task_id,
-                    "attempt_number": attempt_number,
-                    "provider_status": status,
-                },
-            )
-            submission_path.unlink(missing_ok=True)
             raise SegmentGenerationError(
                 f"{segment['generation_task_id']} white-model quality reset "
                 f"attempt {attempt_number} ended with {status}. Automatic retry is "
@@ -285,17 +274,8 @@ def ensure_white_model_predecessor(
         content = result.get("content")
         video_url = content.get("video_url") if isinstance(content, dict) else None
         if not isinstance(video_url, str) or not video_url:
-            write_json(
-                failure_path,
-                {
-                    "contract": "seedance-white-model-quality-reset-failure-v1",
-                    **expected_identity,
-                    "provider_task_id": task_id,
-                    "attempt_number": attempt_number,
-                    "provider_status": "missing_video",
-                },
-            )
-            submission_path.unlink(missing_ok=True)
+            submission["status"] = "missing_video"
+            write_json(submission_path, submission)
             raise SegmentGenerationError(
                 f"{segment['generation_task_id']} white-model quality reset "
                 f"attempt {attempt_number} returned no video. Automatic retry is "
@@ -334,5 +314,5 @@ def ensure_white_model_predecessor(
         return output_video
     raise SegmentGenerationError(
         f"{segment['generation_task_id']} white-model quality reset failed after "
-        f"{MAX_PROVIDER_ATTEMPTS} attempts: {'; '.join(failures)}"
+        f"{MAX_WHITE_MODEL_RESET_ATTEMPTS} attempts: {'; '.join(failures)}"
     )

@@ -122,29 +122,39 @@ def _validate_predecessor_inheritance_budget(
 
 
 def _validate_shot_scale_grammar(segments: list[dict[str, Any]]) -> None:
-    """Reject stage-like wide coverage while preserving authored shot judgment."""
+    """Enforce few-character, close-up-led coverage and narrow wide exceptions."""
 
     shots_by_scene: dict[str, list[dict[str, Any]]] = {}
+    all_shots: list[dict[str, Any]] = []
     for segment in segments:
         scene_id = segment["story_plan"]["scene_id"]
         shots_by_scene.setdefault(scene_id, []).extend(segment["shots"])
+        all_shots.extend(segment["shots"])
 
     for scene_id, shots in shots_by_scene.items():
-        if len(shots) >= 3 and not any(
-            shot["scale_view"] in TIGHT_ATTENTION_VIEWS for shot in shots
-        ):
-            raise StoryVideoError(
-                f"{scene_id} has three or more Shots but no close-up, reaction, "
-                "insert, or POV attention beat"
-            )
-        consecutive_wide = 0
-        for shot in shots:
+        for index, shot in enumerate(shots):
             if shot["scale_view"] in WIDE_SCALE_VIEWS:
-                consecutive_wide += 1
-                if consecutive_wide >= 3:
+                blocking = str(shot.get("blocking_movement_en", ""))
+                if not blocking.casefold().startswith("position-change exception:"):
                     raise StoryVideoError(
-                        f"{scene_id} contains three consecutive establishing/wide "
-                        "Shots and reads as stage-tableau coverage"
+                        f"{shot['shot_id']} {shot['scale_view']} must prefix "
+                        "Blocking / Movement with 'position-change exception:'"
                     )
-            else:
-                consecutive_wide = 0
+                if (
+                    index + 1 < len(shots)
+                    and shots[index + 1]["scale_view"] in WIDE_SCALE_VIEWS
+                ):
+                    raise StoryVideoError(
+                        f"{scene_id} contains consecutive establishing/wide Shots; "
+                        "the position-change exception must be brief"
+                    )
+
+    if len(all_shots) >= 2:
+        tight_count = sum(
+            shot["scale_view"] in TIGHT_ATTENTION_VIEWS for shot in all_shots
+        )
+        if tight_count <= len(all_shots) - tight_count:
+            raise StoryVideoError(
+                "Close-up, reaction, insert, and POV Shots must outnumber medium "
+                "and wide coverage across the complete screenplay"
+            )

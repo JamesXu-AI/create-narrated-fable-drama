@@ -276,7 +276,6 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
         "identity_reference_coverage": identity_coverage,
         "identity_non_submission_roles": absent,
         "dialogue_cues": row["dialogue_cues"],
-        "editable_hold_seconds": row["editable_hold_seconds"],
         "final_visible_state": row["final_visible_state"],
         "final_sound_state": row["final_sound_state"],
         "audio_policy": {

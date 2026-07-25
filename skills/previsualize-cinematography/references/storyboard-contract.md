@@ -45,14 +45,16 @@ Information. Style and resolution may be conversationally selected upstream;
 Storyboard never resets them to defaults.
 
 Use a `Field | Value` table that states target country, target language, runtime,
-aspect ratio, audience point of
-view, visual progression, camera grammar, shot-size/intimacy grammar,
+aspect ratio, audience point of view, visual progression, camera grammar,
+shot-size/intimacy grammar, visible-character economy, eyeline-axis grammar,
 lighting/color grammar, production-design motifs, performance grammar, native-audio
-grammar, and editorial rhythm. The shot-size/intimacy grammar must name the
-project's tight-coverage baseline and the exact story conditions that permit a
-wide view. Use the exact field name `Shot Size and Intimacy Grammar`. Every value
-must be a chosen production decision, not a menu, slogan, or generic adjective
-such as `cinematic`, `epic`, or `beautiful`.
+grammar, and editorial rhythm. Use exact field names `Visible Character Economy`,
+`Eyeline Axis Grammar`, and `Shot Size and Intimacy Grammar`. The values must state
+the fewest-character composition baseline, how A/B screen sides and the camera side
+of the axis remain stable, that ECU/CU/MCU dominate, and that a wider Shot exists
+only for the shortest readable part of a story-required position change. Every
+value must be a chosen production decision, not a menu, slogan, or generic
+adjective such as `cinematic`, `epic`, or `beautiful`.
 Use exact rows `Target Country`, `Target Language`, `Visual Style`, `Resolution`,
 and `Aspect Ratio`; Aspect Ratio is `16:9`.
 
@@ -231,6 +233,8 @@ World and Population Evidence
 Authorized Population
 Character Segment States
 Required Presence Locks
+Visible Character Economy
+Eyeline Axis and Screen Direction
 Persistent Anchors
 Anchor Visibility Requirement
 Style and Image Quality
@@ -271,6 +275,14 @@ who remains physically present outside the crop, who may be hidden behind which
 occluder, and which explicit event authorizes entrance, exit, reveal, concealment,
 or re-entry.
 
+`Visible Character Economy` names the minimum story-active subjects actually
+visible in each Ordered Shot, normally one subject or one speaker/listener pair,
+and names which still-present roles remain outside the crop. `Eyeline Axis and
+Screen Direction` states the interaction axis, A/B marks, A/B screen sides and
+opposed look directions, camera side, and any motivated neutral move or
+re-establishment. For a non-interaction Segment, state the single subject's screen
+direction and the off-screen target that replaces a two-person axis.
+
 For a serial successor, `Predecessor and Evidence` and `Temporal Continuity
 Evidence` explicitly state that virtual production must inspect the actual approved
 predecessor before submitting the successor and adapt the current Segment when its
@@ -305,20 +317,23 @@ For every Shot:
   `medium_close_up`, `medium`, `medium_wide`, `wide`, or `extreme_wide`;
 - treat `extreme_close_up`, `close_up`, and `medium_close_up` as the normal scale
   for decisive faces, eye lines, breaths, paws/hands, wounds, clues, reactions,
-  and story-critical details. Use insert/reaction/POV intent inside the camera and
-  action fields while retaining one physical Shot Size;
-- use `medium_wide`, `wide`, or `extreme_wide` only when the current Shot must
-  reveal new geography, scale, full-body mechanics, entrance/exit travel, or a
-  changed spatial relationship. Do not use a wide frame merely because a Scene or
-  Segment begins, because several roles remain physically present, or because the
-  set has not appeared recently;
+  speech, listening, and story-critical details. These three sizes must outnumber
+  all other sizes across the complete Storyboard. Use insert/reaction/POV intent
+  inside the camera and action fields while retaining one physical Shot Size;
+- use `medium` only when a small shared action or two-character relationship
+  cannot read in MCU;
+- use `medium_wide`, `wide`, or `extreme_wide` only for the shortest readable
+  portion of a story-required entrance, exit, crossing, approach, retreat,
+  transfer between marks, or other consequential position change. Prefix `Space,
+  Blocking and Gaze` with `position-change exception:` and name the start mark,
+  path, landing mark, changed relation, and tight attention target that follows.
+  Never place two wider Shots consecutively;
+- do not use a wide frame because a Scene or Segment begins, scenery or scale is
+  attractive, several roles remain physically present, the set has not appeared
+  recently, or variety is desired;
 - preserve or tighten screenplay `close_up`, `extreme_close_up`, `insert`, and
   `reaction` intent. Compiling any of them to `medium_wide`, `wide`, or
   `extreme_wide` is forbidden;
-- do not author three consecutive `medium_wide`/`wide`/`extreme_wide` Shots unless
-  each row names different indispensable spatial information. A frontal all-cast
-  master, repeated set reveal, or generic continuity proof is never such an
-  exception;
 - author the transition and camera behavior the event needs; keep a Shot locked or
   give it one dominant move. Put a motivated camera change in the next Shot instead
   of stacking push, pull, pan, tilt, crane, and orbit instructions together;
@@ -327,6 +342,8 @@ For every Shot:
   transition or inertia when relevant;
 - preserve entrances, landing positions, gaze, addressees, listener reactions,
   wounds, props, and action completion from the screenplay;
+- preserve the Segment's declared eyeline axis and screen directions in every
+  single, OTS, reaction, and reverse; the camera never becomes an addressee;
 - name which persistent set/prop anchors remain visible, which are temporarily
   outside the frame or occluded, and which later Shot re-establishes them;
 - place exact dialogue verbatim beside its speaker and trigger; virtual production converts it
@@ -357,6 +374,9 @@ Use a short prose paragraph that states what virtual production must prioritize 
 be compressed. It must not introduce new story action or repeat every Shot row.
 It must not prescribe Prompt headings, paragraphs, Shot labels/count, movement
 count, word count, vocabulary, or timing syntax.
+It must explicitly carry the Segment's minimum visible-character composition,
+eyeline axis and screen directions, close-up dominance, and every labeled
+position-change exception into the final Prompt.
 
 Also state the media budget decision. Prefer four or five total provider references
 when sufficient and order identity-critical references first, but treat those as
@@ -403,7 +423,12 @@ Accept only when:
   camera move;
 - every Ordered Shot declares one valid Shot Size; decisive faces, reactions,
   active body details, clues, and story-bearing information receive tight coverage,
-  while every medium-wide or wider Shot names indispensable spatial information;
+  ECU/CU/MCU outnumber all other Shots, and every medium-wide or wider Shot is a
+  labeled shortest-readable position-change exception followed directly by tight
+  attention;
+- each Segment states the minimum visible-character composition and a concrete
+  eyeline axis/screen-direction contract; singles, OTS, reactions, and reverses
+  preserve it;
 - no screenplay `close_up`, `extreme_close_up`, `insert`, or `reaction` is widened
   to `medium_wide`, `wide`, or `extreme_wide`, and no Scene or Segment defaults to
   repeated frontal stage-tableau coverage;

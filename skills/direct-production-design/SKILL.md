@@ -40,6 +40,18 @@ how dialogue becomes storytelling, who listens, mouth behavior, blocking, camera
 edit, or exact dialogue. Those facts remain in `screenplay.md` and
 `storyboard.md`.
 
+Support the project-wide few-character, explicit-axis, close-up-led doctrine
+without inventing camera direction:
+
+- create assets only for screenplay-authorized roles; never add decorative
+  characters, bystanders, or crowd variants;
+- keep each individual identity image single-subject with face, eyes, mouth,
+  hands/paws, and distinguishing details clear enough for ECU/CU/MCU generation;
+- keep Location masters free of independent performers and of any unapproved
+  population; only screenplay-authorized embedded NPC population may appear; and
+- do not compose asset media as a full-cast finished Shot or bake an eyeline,
+  blocking relationship, or wide-shot choice into reusable identity authority.
+
 ## Character storyteller identity
 
 When one character participates in dialogue and tells the story, create one
@@ -111,6 +123,24 @@ python3 skills/direct-production-design/scripts/build_initial_production_design.
 python3 skills/direct-production-design/scripts/validate_production_design.py \
   --task-dir TASK_DIR
 ```
+
+### Asset-library discovery gate
+
+Resolve the repository root from this Skill, never from the task working
+directory alone. Before any Seedream call, inspect the canonical shared library:
+
+```text
+REPOSITORY_ROOT/workspace/assets/assets.json
+REPOSITORY_ROOT/workspace/assets/
+```
+
+Run `--inspect-semantic-reuse` first. Search the catalog by semantic description
+and inspect the reported same-type candidates. Also inspect
+`uncatalogued_exact_path_matches`. If a planned media path already exists under
+`workspace/assets/` but its catalog row is missing, stop before generation,
+report the existing path, and recover its validated semantics and provider URI
+into the canonical catalog. Never treat a missing asset ID as proof that the
+media is absent, and never regenerate or overwrite uncatalogued existing media.
 
 Keep only final reusable media, the visual plan, and repository-root
 `workspace/assets/assets.json`. Do not create narrative JSON or copied Prompt sidecars.

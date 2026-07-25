@@ -1,4 +1,4 @@
 interface:
-  display_name: "Finish Postproduction · 寓言剧后期"
-  short_description: "保持对白与角色旁白连续并完成最终成片"
-  default_prompt: "使用 $finish-postproduction 在所有 AI 解说剧/寓言 Segment 均由人接受后展示简洁装配计划并等待确认，再完成原生声音、自然旁白衔接、字幕和双版本成片，最后等待验收。"
+  display_name: "Finish Postproduction · 剪辑修复大师"
+  short_description: "基于真实成片接缝证据决定局部剪辑、声音连续与画面修复策略"
+  default_prompt: "使用 $finish-postproduction 以剪辑大师和修复大师身份检查真实成片，保护少角色、明确对视轴、特写为主的镜头语法，完整保留剧情必需的位置变化但剪掉落位后的无效宽景停留，不用数字裁切或溶解伪造/掩盖特写、越轴和拥挤构图，由模型决定最小修复策略并验证最终交付。"

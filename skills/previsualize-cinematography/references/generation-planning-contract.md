@@ -40,6 +40,12 @@ internal Shots. Pack consecutive Shots when one duration, operation/reference se
 identity and location system, dialogue/audio contract, and continuity state can
 govern them.
 
+Prefer Segments whose visible composition can be executed with one story-active
+subject or one speaker/listener pair while still preserving upstream visibility
+authority. When several independently controlled performers are story-required,
+split on a motivated reaction, movement landing, or speech boundary instead of
+defaulting to full-cast master coverage.
+
 Create an external Segment boundary only for:
 
 - duration or combined-complexity overflow;
@@ -130,8 +136,10 @@ For a strong coverage reset:
 - preserve Character presence, position/condition, Location, prop, action-result,
   eyeline, and dramatic state in prose and current asset bindings;
 - begin with `extreme_close_up`, `close_up`, or `medium_close_up`;
-- decisively change camera side/angle, viewpoint, composition, focal subject, or
-  shot/reverse-shot relation so the opening cannot read as a continued stage master;
+- preserve the declared eyeline axis unless a visible neutral move or motivated
+  re-establishment authorizes crossing it, while decisively changing angle,
+  viewpoint, composition, focal subject, or shot/reverse-shot relation so the
+  opening cannot read as a continued stage master;
   and
 - mark `Coverage Reset Requirement` exactly as
   `required: no_predecessor_media; opening=<first Shot Size>;
@@ -143,6 +151,11 @@ inside the predecessor Segment or move the boundary before generation.
 Provider media affects the whole Segment. A later internal Shot cannot deactivate a
 bound roster or identity reference. Split the Segment after visible exits when an
 exiting roster and an entering roster require mutually exclusive authority.
+
+`medium_wide`, `wide`, and `extreme_wide` are never planning conveniences. Each
+must be a labeled `position-change exception:` limited to the shortest readable
+entrance, exit, crossing, approach, retreat, transfer between marks, or other
+consequential relocation, followed by tight coverage.
 
 ## Preserve location state
 
@@ -201,4 +214,6 @@ control, chains two predecessor-media handoffs, fails to white-model the first
 extension, fails to extend/repack an unfinished same-Scene phase before a mandatory
 reset, opens a reset wider than MCU, permits inherited camera or color
 reconstruction, replays a completed beat, omits world/population authority, depends
-on unreviewed evidence, or chooses a fallback that changes an approved story fact.
+on unreviewed evidence, crowds a Shot without causal necessity, leaves an
+interaction axis ambiguous, uses an unlabeled/decorative wider Shot, or chooses a
+fallback that changes an approved story fact.

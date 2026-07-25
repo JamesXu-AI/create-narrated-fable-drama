@@ -14,17 +14,11 @@ from .qc_evidence import (
     _boundary_directory,
     _extract_frame_evidence,
     _matches_selected,
-    _render_comparison,
-    _render_repaired_sample,
     _render_strict_sample,
 )
 from .qc_metrics import (
-    _extract_tail_yuv_frames,
-    _has_detectable_mismatch,
     _normalized_luma_correlation,
-    append_segment_repair_filter,
     measure_boundary,
-    triage_boundary,
 )
 from .qc_policy import (
     DEFAULT_CONFIG,
@@ -45,9 +39,8 @@ def prepare_boundary_qc(
     *,
     config_path: Path = DEFAULT_CONFIG,
     selected_boundary: str | None = None,
-    generate_candidates: bool = True,
 ) -> tuple[Path, dict[str, dict[str, Any]], dict[str, Any]]:
-    """Create pre-assembly evidence and return safe plans keyed by incoming Segment."""
+    """Create measurements only; all repair choices remain model-authored."""
     task_dir = task_dir.expanduser().resolve()
     config = load_config(config_path)
     root = task_dir / ".pending" / "finish-postproduction" / "boundary-qc"
@@ -60,7 +53,7 @@ def prepare_boundary_qc(
         "contract": "finish-boundary-qc/v1",
         "enabled": bool(config["enabled"]),
         "source_policy": "generated_segments_read_only",
-        "decision_scope": "technical_detection_and_repair_candidates_only",
+        "decision_scope": "measurement_and_evidence_only_no_repair_decision",
         "semantic_review_authority": "video-review",
         "config_path": str(config_path.expanduser().resolve()),
         "task_dir": str(task_dir),
@@ -90,7 +83,6 @@ def prepare_boundary_qc(
         _render_strict_sample(outgoing, incoming, boundary, original_sample, config)
         evidence = _extract_frame_evidence(original_sample, directory, config)
         metrics = measure_boundary(outgoing, incoming, config, boundary)
-        status, reason, plan = triage_boundary(boundary, metrics, config)
         item: dict[str, Any] = {
             "boundary_id": f"{boundary['from']}--{boundary['to']}",
             "from": boundary["from"],
@@ -107,58 +99,20 @@ def prepare_boundary_qc(
             },
             "pre_assembly_evidence": evidence,
             "metrics": metrics,
-            "technical_triage": status,
-            "technical_triage_reason": reason,
+            "technical_triage": "measurement_complete_model_decision_required",
+            "technical_triage_reason": (
+                "Python recorded evidence only and did not select or apply a repair."
+            ),
             "repair": None,
             "final_timeline_audit": None,
         }
-        if plan is not None:
-            plan.update(
-                {
-                    "boundary_id": item["boundary_id"],
-                    "from": boundary["from"],
-                    "to": boundary["to"],
-                    "applied_to_picture_lock": status == "safe_color_match_planned",
-                }
-            )
-            candidate_paths: dict[str, str] = {}
-            if generate_candidates:
-                candidates = directory / "candidates"
-                for name, strength in config["repair"]["candidate_strengths"].items():
-                    candidate = candidates / f"{name}.mp4"
-                    _render_repaired_sample(
-                        original_sample,
-                        candidate,
-                        plan,
-                        strength=float(strength),
-                    )
-                    candidate_paths[str(name)] = str(candidate.resolve())
-                comparison = directory / "original-vs-matched.mp4"
-                _render_comparison(
-                    original_sample,
-                    Path(candidate_paths["matched"]),
-                    comparison,
-                )
-                plan["comparison_preview"] = str(comparison.resolve())
-            plan["candidate_previews"] = candidate_paths
-            item["repair"] = plan
-            if status == "safe_color_match_planned":
-                repair_plans[str(boundary["to"])] = plan
         manifest["boundaries"].append(item)
         _write_json(manifest_path, manifest)
     if selected_boundary and not manifest["boundaries"]:
         raise BoundaryQCError(f"Selected boundary was not found: {selected_boundary}")
-    blocking = [
-        item["boundary_id"]
-        for item in manifest["boundaries"]
-        if item["technical_triage"]
-        in {"review_required", "repair_candidate_review_required"}
-    ]
-    manifest["pre_assembly_status"] = (
-        "review_required" if blocking else "ready_for_picture_lock"
-    )
-    manifest["blocking_boundaries"] = blocking
-    manifest["planned_repair_count"] = len(repair_plans)
+    manifest["pre_assembly_status"] = "ready_for_picture_lock"
+    manifest["blocking_boundaries"] = []
+    manifest["planned_repair_count"] = 0
     _write_json(manifest_path, manifest)
     return manifest_path, repair_plans, manifest
 
@@ -462,7 +416,6 @@ def audit_picture_lock(
         for item in picture_edl.get("boundaries", [])
         if isinstance(item, dict)
     }
-    blocking: list[str] = []
     for item in manifest.get("boundaries", []):
         boundary_id = str(item["boundary_id"])
         try:
@@ -478,38 +431,17 @@ def audit_picture_lock(
         metrics = None
         if boundary.get("picture_edit") == "hard_cut":
             metrics = _measure_master_sample(sample, config)
-            high_match = float(metrics["luma_shape_correlation"]) >= float(
-                config["analysis"]["minimum_match_similarity"]
-            )
-            residual = high_match and _has_detectable_mismatch(metrics, config)
-            if item.get("repair") and item["repair"].get("applied_to_picture_lock"):
-                technical_status = (
-                    "residual_review_required"
-                    if residual
-                    else "correction_within_detection_thresholds"
-                )
-            elif item.get("technical_triage") == "no_technical_correction_needed":
-                technical_status = (
-                    "matched_cut_review_required"
-                    if residual
-                    else "no_high_confidence_flash_signature"
-                )
-            else:
-                technical_status = "authored_cut_evidence_only"
-            if technical_status.endswith("review_required"):
-                blocking.append(boundary_id)
+            technical_status = "measurement_complete_model_review_authority"
         else:
-            technical_status = "authored_transition_rendered_for_review"
+            technical_status = "transition_evidence_complete_model_review_authority"
         item["final_timeline_audit"] = {
             "evidence": evidence,
             "metrics": metrics,
             "technical_status": technical_status,
         }
     manifest["picture_lock"] = str(picture_lock.resolve())
-    manifest["final_timeline_status"] = (
-        "review_required" if blocking else "technical_audit_complete"
-    )
-    manifest["final_timeline_blocking_boundaries"] = blocking
+    manifest["final_timeline_status"] = "technical_audit_complete"
+    manifest["final_timeline_blocking_boundaries"] = []
     _write_json(manifest_path, manifest)
     return manifest
 
@@ -527,28 +459,24 @@ def main() -> int:
         "--boundary",
         help="Optional FROM:TO selector, for example segment-005:segment-006.",
     )
-    parser.add_argument("--no-candidates", action="store_true")
     args = parser.parse_args()
     try:
-        from post_timeline import compile_timelines, discover_segments
-
         task_dir = args.task_dir.expanduser().resolve()
-        if args.picture_edl is not None:
-            picture_edl = _load_json(
-                args.picture_edl.expanduser().resolve(),
-                label="standalone picture EDL",
+        if args.picture_edl is None:
+            raise BoundaryQCError(
+                "--picture-edl is required; Boundary QC cannot invent a timeline"
             )
-            records = standalone_records_from_edl(task_dir, picture_edl)
-        else:
-            records = discover_segments(task_dir)
-            picture_edl, _ = compile_timelines(task_dir, records)
+        picture_edl = _load_json(
+            args.picture_edl.expanduser().resolve(),
+            label="standalone picture EDL",
+        )
+        records = standalone_records_from_edl(task_dir, picture_edl)
         manifest_path, repairs, manifest = prepare_boundary_qc(
             task_dir,
             records,
             picture_edl,
             config_path=args.config.expanduser().resolve(),
             selected_boundary=args.boundary,
-            generate_candidates=not args.no_candidates,
         )
     except (BoundaryQCError, OSError, subprocess.CalledProcessError) as exc:
         print(

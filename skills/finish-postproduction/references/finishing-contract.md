@@ -13,10 +13,13 @@ boundary-QC data, subtitle cues, and delivery manifests are technical records on
 
 ## Timeline
 
-Postproduction requires one accepted audiovisual Segment per Storyboard row.
-It executes the authored transition and may normalize delivery properties but may
-not rewrite dialogue, revoice narration, synthesize missing speech, redesign a
-shot, or hide a generation defect.
+Postproduction requires one accepted audiovisual Segment per Storyboard row. It
+first measures the actual picture and sound and then requires a complete
+`llm-postproduction-repair-plan/v1` written by the Editor and Restoration Master
+model. The model decides exact picture source points, cuts, overlaps, transitions,
+retained source ranges and internal deletions, local visual repairs, independent
+audio splices and placement, gains, fades, bridges, or regeneration. Python does
+not translate an authored transition label into an operation or duration.
 
 The EDL is:
 
@@ -24,17 +27,20 @@ The EDL is:
 .pending/finish-postproduction/post-production/picture-audio-edl.json
 ```
 
-Every external seam receives reversible pre-assembly and final-timeline QC.
-Generated Segment files remain read-only. An extension trim is legal only when
-Storyboard speech windows and safe handles prove it removes no authored action or
-speech.
+Every external seam receives actual final-3-second/first-3-second picture-and-sound
+evidence, reversible pre-assembly measurement, and final-timeline measurement.
+Generated Segment files remain read-only. A picture or audio trim is legal only
+when the model declares the exact interval and the validator proves that every
+Storyboard dialogue window remains intact.
 
 ## Native sound
 
 Each accepted clip keeps its synchronized Seedance-native dialogue, storytelling,
 breath, reaction, ambience, effects, and restrained music. The edit preserves the
 same established character voice across on-camera and off-camera storytelling.
-A short terminal fade may prevent a digital click but may not clip a final word.
+Every source window, timeline offset, gain, fade, and terminal fade is explicit in
+the model plan. The renderer never pads silence, invents a de-click duration, or
+adds a terminal fade.
 
 ## Subtitle chain
 

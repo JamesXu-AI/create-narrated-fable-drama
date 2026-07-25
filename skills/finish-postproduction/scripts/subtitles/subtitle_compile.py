@@ -23,6 +23,27 @@ from .subtitle_style import (
 )
 
 
+def _source_time_to_retained_time(
+    source_ranges: list[tuple[float, float]],
+    source_time: float,
+    *,
+    tolerance_seconds: float,
+) -> float | None:
+    elapsed = 0.0
+    for range_start, range_end in source_ranges:
+        if (
+            range_start - tolerance_seconds
+            <= source_time
+            <= range_end + tolerance_seconds
+        ):
+            return elapsed + max(
+                0.0,
+                min(range_end - range_start, source_time - range_start),
+            )
+        elapsed += range_end - range_start
+    return None
+
+
 def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
     project_context = load_project_context(task_dir)
     style = _load_json(style_path)
@@ -63,7 +84,7 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
             storyboard.get("duration_seconds"), f"{segment_id} Storyboard duration"
         )
         source_in = _number(
-            event.get("source_in_seconds", 0.0), f"{segment_id} EDL source in"
+            event.get("source_in_seconds"), f"{segment_id} EDL source in"
         )
         source_out = _number(
             event.get("source_out_seconds"), f"{segment_id} EDL source out"
@@ -74,10 +95,58 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
             raise SubtitleBuildError(
                 f"{segment_id} EDL source out exceeds the Storyboard duration."
             )
-        if abs(event_duration - (source_out - source_in)) > 0.05:
+        raw_ranges = event.get("source_ranges")
+        if not isinstance(raw_ranges, list) or not raw_ranges:
             raise SubtitleBuildError(
-                f"{segment_id} EDL duration differs from its editorial source range."
+                f"{segment_id} EDL lacks explicit retained source ranges."
             )
+        source_ranges: list[tuple[float, float]] = []
+        prior_range_end = source_in
+        for range_index, source_range in enumerate(raw_ranges):
+            if not isinstance(source_range, dict):
+                raise SubtitleBuildError(
+                    f"{segment_id} EDL source range {range_index + 1} is invalid."
+                )
+            range_start = _number(
+                source_range.get("source_in_seconds"),
+                f"{segment_id} retained source in",
+            )
+            range_end = _number(
+                source_range.get("source_out_seconds"),
+                f"{segment_id} retained source out",
+            )
+            if (
+                range_start < source_in - 0.001
+                or range_end > source_out + 0.001
+                or range_end <= range_start
+                or range_start < prior_range_end - 0.001
+            ):
+                raise SubtitleBuildError(
+                    f"{segment_id} retained source ranges are invalid."
+                )
+            source_ranges.append((range_start, range_end))
+            prior_range_end = range_end
+        retained_duration = sum(
+            range_end - range_start
+            for range_start, range_end in source_ranges
+        )
+        if abs(event_duration - retained_duration) > 0.05:
+            raise SubtitleBuildError(
+                f"{segment_id} EDL duration differs from retained picture ranges."
+            )
+
+        def source_to_relative(source_time: float, *, cue_id: str) -> float:
+            result = _source_time_to_retained_time(
+                source_ranges,
+                source_time,
+                tolerance_seconds=0.05,
+            )
+            if result is not None:
+                return result
+            raise SubtitleBuildError(
+                f"{segment_id} edit removes dialogue cue {cue_id}."
+            )
+
         ordered_source_cues = [
             cue
             for source_block in storyboard.get("timeline_blocks", [])
@@ -124,12 +193,28 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                 source_start, source_end, timing_overridden = source_interval(cue)
                 if source_end <= source_start:
                     raise SubtitleBuildError(f"{segment_id} cue timing is invalid.")
-                if source_start < source_in - 0.05 or source_end > source_out + 0.05:
+                containing_range = next(
+                    (
+                        (range_start, range_end)
+                        for range_start, range_end in source_ranges
+                        if source_start >= range_start - 0.05
+                        and source_end <= range_end + 0.05
+                    ),
+                    None,
+                )
+                if containing_range is None:
                     raise SubtitleBuildError(
-                        f"{segment_id} editorial trim intersects dialogue cue {cue.get('cue_id')}."
+                        f"{segment_id} edit intersects dialogue cue {cue.get('cue_id')}."
                     )
-                relative_start = max(0.0, source_start - source_in)
-                relative_end = min(event_duration, source_end - source_in)
+                cue_id = str(cue.get("cue_id"))
+                relative_start = source_to_relative(
+                    source_start,
+                    cue_id=cue_id,
+                )
+                relative_end = source_to_relative(
+                    source_end,
+                    cue_id=cue_id,
+                )
                 text = str(cue.get("exact_text", "")).strip()
                 if not text:
                     raise SubtitleBuildError(f"{segment_id} cue has no exact text.")
@@ -160,19 +245,29 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                 )
                 source_position = source_cue_positions[id(cue)]
                 previous_end = (
-                    max(
-                        0.0,
-                        source_interval(ordered_source_cues[source_position - 1])[1]
-                        - source_in,
+                    source_to_relative(
+                        source_interval(
+                            ordered_source_cues[source_position - 1]
+                        )[1],
+                        cue_id=str(
+                            ordered_source_cues[source_position - 1].get(
+                                "cue_id"
+                            )
+                        ),
                     )
                     if source_position > 0
                     else 0.0
                 )
                 next_start = (
-                    min(
-                        event_duration,
-                        source_interval(ordered_source_cues[source_position + 1])[0]
-                        - source_in,
+                    source_to_relative(
+                        source_interval(
+                            ordered_source_cues[source_position + 1]
+                        )[0],
+                        cue_id=str(
+                            ordered_source_cues[source_position + 1].get(
+                                "cue_id"
+                            )
+                        ),
                     )
                     if source_position + 1 < len(ordered_source_cues)
                     else event_duration

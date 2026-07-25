@@ -63,6 +63,11 @@ action, staging, character-presence requirements, story-world continuity, refere
 and Segment Prompt. Repair only affected downstream artifacts, validate them, and
 return a revised compact next-step plan. Never ask the human to edit a JSON field,
 hash, ledger, or internal artifact path.
+Interpret “all characters remain present” as diegetic presence unless the user
+explicitly requires simultaneous visibility. Preserve off-screen continuity and
+the declared eyeline axis; do not widen into a full-cast composition. A visible
+entrance may use only the shortest labeled `position-change exception:` before
+returning to tight coverage.
 
 The human may change story, dialogue, character appearance, performance, story-world
 design, population, camera, lighting, sound, transition, duration, reference,

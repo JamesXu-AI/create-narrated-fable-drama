@@ -17,6 +17,9 @@ protected identity.
 - Use one subject per identity image. Do not use turnarounds, collages, or repeated
   views that can become duplicate performers.
 - Keep facial features and hands/paws readable enough for close dramatic coverage.
+- Do not combine multiple independent performers into one reusable identity image
+  or invent decorative/background characters; final compositions are intended to
+  remain sparse and close-up-led.
 - Exclude duplicate bodies, extra limbs, fused anatomy, mirror doubles, background
   copies, typography, logos, and watermarks.
 
@@ -30,6 +33,8 @@ protected identity.
   separates them.
 - Do not include a framing storyteller inside an embedded-world Location merely
   because that character's voice continues over it.
+- Keep independent performers out of Location masters. Include only the exact
+  screenplay-authorized embedded population; never pre-bake a full-cast tableau.
 
 ## Image grammar
 
@@ -53,4 +58,5 @@ clothing, architecture, or stereotypes unsupported by the Story.
 
 Accept an asset only when it is a stable reusable authority, matches the
 screenplay-owned identity and world facts, contains no unintended performer, and
-can be referenced by Seedance without implying a wrong narrative presence.
+can support close-up-led generation without implying a wrong narrative presence,
+crowded frame, eyeline, or wide-shot composition.

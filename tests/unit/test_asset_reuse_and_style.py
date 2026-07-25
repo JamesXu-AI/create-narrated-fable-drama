@@ -18,6 +18,7 @@ from build_initial_production_design import (  # noqa: E402
     _accepted_generated_visuals,
     _require_codex_semantic_decisions,
     _semantic_reuse_review,
+    _uncatalogued_exact_path_matches,
 )
 from production_design.contract import (  # noqa: E402
     DEFAULT_STYLE_EXECUTION_EN,
@@ -191,6 +192,59 @@ class AssetReuseAndStyleTests(unittest.TestCase):
                 accepted["new-crown"]["path"],
                 "workspace/assets/props/new-crown.png",
             )
+
+    def test_exact_library_media_missing_from_catalog_is_exposed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository_root = Path(temporary)
+            task_root = repository_root / "runtime" / "task"
+            task_root.mkdir(parents=True)
+            existing = (
+                repository_root
+                / "workspace"
+                / "assets"
+                / "costumes"
+                / "elephant-wounded"
+                / "image.png"
+            )
+            existing.parent.mkdir(parents=True)
+            existing.write_bytes(b"existing-injured-elephant")
+            catalog = {
+                "contract": "production-design-assets",
+                "path_resolution": "repository_root_relative",
+                "assets": {},
+            }
+            (repository_root / "workspace" / "assets" / "assets.json").write_text(
+                json.dumps(catalog), encoding="utf-8"
+            )
+            jobs = [
+                {
+                    "asset_id": "costume-elephant-wounded",
+                    "kind": "costume",
+                    "relative_path": Path(
+                        "workspace/assets/costumes/elephant-wounded/image.png"
+                    ),
+                }
+            ]
+
+            matches = _uncatalogued_exact_path_matches(
+                task_root,
+                jobs,
+                repository_root=repository_root,
+            )
+
+        self.assertEqual(
+            matches,
+            [
+                {
+                    "target_asset_id": "costume-elephant-wounded",
+                    "asset_type": "costume",
+                    "existing_media_path": (
+                        "workspace/assets/costumes/elephant-wounded/image.png"
+                    ),
+                    "required_catalog_path": "workspace/assets/assets.json",
+                }
+            ],
+        )
 
 
 if __name__ == "__main__":

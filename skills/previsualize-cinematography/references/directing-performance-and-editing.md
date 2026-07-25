@@ -151,9 +151,13 @@ Do not stop at `the scene needs more tension`, `use a close-up`, or `the listene
 
 Default the finished coverage to the closest frame that preserves the beat's
 necessary information. Let faces, eye lines, breaths, active hands/paws, wounds,
-clues, and listener reactions carry decisive changes. Use a wide frame only when
-new geography, scale, full-body mechanics, entrance/exit travel, or relationship
-distance is the event. Never solve ensemble continuity by staging the whole cast
+clues, and listener reactions carry decisive changes. Keep the visible composition
+to one story-active subject or one speaker/listener pair whenever possible. Use a
+wide frame only as a labeled `position-change exception:` for the shortest
+readable entrance, exit, crossing, approach, retreat, transfer between marks, or
+other consequential relocation, then return directly to tight coverage. Before
+interaction coverage, lock A/B screen sides, opposed look directions, the eyeline
+axis, and camera side. Never solve ensemble continuity by staging the whole cast
 frontally in a repeated master; physical presence may continue outside a close
 crop.
 

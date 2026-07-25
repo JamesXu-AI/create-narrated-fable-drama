@@ -33,6 +33,15 @@ The Segment Prompt is the complete instruction Seedance sees. It must:
   readable responsibility;
 - reproduce the Storyboard operation, ordered internal shots, framing, action,
   blocking, gaze, light, sound, and landing state;
+- before Shot 1, copy the Storyboard direction under the exact labels
+  `Visible-character economy:`, `Eyeline axis and screen direction:`, and
+  `Close-up-led coverage:`; keep the actual frame to the fewest story-active
+  subjects and preserve A/B screen sides, opposed looks, axis line, and camera
+  side;
+- begin each beat `Shot N: <exact Storyboard shot_size>.`; ECU/CU/MCU must dominate,
+  and any MWS/WS/EWS beat must repeat the literal
+  `position-change exception:` with its start mark, path, landing mark, changed
+  relation, and tight return;
 - name the exact speaker for each line and put the exact words once in `{braces}`;
 - state whether the speaker is visible and lip-synced, visible as a storyteller,
   off camera with the same established voice, an external voiceover, or an
@@ -50,7 +59,9 @@ The Segment Prompt is the complete instruction Seedance sees. It must:
 - state the screenplay's exact approved Visual Style; resolution is supplied as
   the selected provider parameter and defaults to 1080p only when not overridden;
 - forbid generated captions, paraphrased speech, duplicate characters, identity
-  drift, unexplained appearance/disappearance, logos, and watermarks.
+  drift, decorative bystanders, unauthorized full-cast composition, reversed or
+  ambiguous eyelines, unmotivated widening, unexplained
+  appearance/disappearance, logos, and watermarks.
 
 Use natural event order, not provider-facing second ranges. Internal timing remains
 derived from the Storyboard for subtitle and edit math.
@@ -92,4 +103,6 @@ rewrite the approved story silently during generation.
 Stop and return upstream when Storyboard and screenplay disagree, reference media
 cannot represent the required visible cast, a narrator transition lacks a concrete
 performance bridge, exact speech cannot fit naturally, the prompt would need to
-invent story information, or a predecessor attempt has not passed review.
+invent story information, the eyeline axis or position-change exception is
+ambiguous, close-up dominance would be lost, or a predecessor attempt has not
+passed review.

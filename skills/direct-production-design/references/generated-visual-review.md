@@ -8,6 +8,9 @@ Accept only when the image visibly satisfies all of the following:
 
 - exact subject identity, count, anatomy, topology, costume, prop, location, and
   composition authority;
+- character identity media contains one isolated subject with readable face, eyes,
+  mouth, and hands/paws for ECU/CU/MCU use; Location media contains no independent
+  performer, decorative bystander, baked eyeline, or full-cast tableau;
 - exact visual medium and aesthetic treatment;
 - every exclusion, including duplicate-subject and text/logo/watermark rules;
 - for `3D Healing Animation`, an unmistakably stylized soft 3D animated-film

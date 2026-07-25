@@ -1,6 +1,11 @@
 # Frame Occupancy, Entrances, and Exits
 
 Treat presence, absence, negative space, occlusion, entrance, exit, and re-entry as explicit production states. Motion continuity does not repair a subject that is already visible before its authored entrance.
+Keep the frame to the primary event subject and the minimum witness/listener set.
+Other still-present roles remain outside the crop unless the causal event requires
+their simultaneous reaction. An entrance or exit may briefly widen only as a
+`position-change exception:` from first boundary contact through the landing or
+edge release, then coverage returns tight.
 
 ## Contents
 
@@ -174,7 +179,11 @@ entrance_minimum = first readable boundary contact
 
 Allow dialogue during travel only when the story explicitly wants a moving entrance and lip-sync remains readable. Otherwise bind the first line to a visible gate such as `lead foot planted`, `door closed`, `body settled on mark`, or `eye contact established`.
 
-Do not compress a required progressive reveal into a duration that can only produce a pop, dissolve, teleport, or already-present first frame. Shorten the path, widen the shot, simplify the reveal, delay the line, or extend/split the segment.
+Do not compress a required progressive reveal into a duration that can only produce
+a pop, dissolve, teleport, or already-present first frame. Shorten the path,
+briefly widen only the authored position-change interval, simplify the reveal,
+delay the line, or extend/split the Segment. The widened interval ends at the
+arrival/departure landing and does not become a lingering master.
 
 ## Background and ensemble locks
 

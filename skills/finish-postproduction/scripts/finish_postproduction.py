@@ -14,6 +14,7 @@ from subtitles.subtitle_delivery import build
 from subtitles.subtitle_style import DEFAULT_STYLE
 
 from assemble_segment_videos import assemble
+from finishing.plan import RepairPlanError
 from post_timeline import TimelineError, probe_media
 
 
@@ -50,10 +51,20 @@ def _promote_clean_master(task_dir: Path, picture_lock: Path) -> Path:
     return clean
 
 
-def finish(task_dir: Path, *, style_path: Path = DEFAULT_STYLE) -> dict[str, object]:
+def finish(
+    task_dir: Path,
+    *,
+    repair_plan_path: Path,
+    evidence_manifest_path: Path,
+    style_path: Path = DEFAULT_STYLE,
+) -> dict[str, object]:
     task_dir = task_dir.expanduser().resolve()
     _load_project(task_dir)
-    picture_lock = assemble(task_dir)
+    picture_lock = assemble(
+        task_dir,
+        repair_plan_path=repair_plan_path,
+        evidence_manifest_path=evidence_manifest_path,
+    )
     clean = _promote_clean_master(task_dir, picture_lock)
     result = build(task_dir, style_path, render=True)
     if result.get("status") != "FINAL_MASTER_READY":
@@ -81,6 +92,8 @@ def finish(task_dir: Path, *, style_path: Path = DEFAULT_STYLE) -> dict[str, obj
     if (
         not isinstance(boundary_qc, dict)
         or boundary_qc.get("pre_assembly_status") != "ready_for_picture_lock"
+        or boundary_qc.get("decision_authority")
+        != "editor-restoration-master-model"
         or boundary_qc.get("final_timeline_status")
         != "technical_audit_complete"
         or boundary_qc.get("source_segments_mutated") is not False
@@ -104,17 +117,26 @@ def finish(task_dir: Path, *, style_path: Path = DEFAULT_STYLE) -> dict[str, obj
         "background_music_source": audio_sources.get("background_music_source"),
         "boundary_qc_manifest": boundary_qc.get("manifest"),
         "boundary_repair_count": boundary_qc.get("planned_repair_count", 0),
+        "model_repair_plan": str(repair_plan_path.expanduser().resolve()),
+        "evidence_manifest": str(evidence_manifest_path.expanduser().resolve()),
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-dir", required=True, type=Path)
+    parser.add_argument("--repair-plan", required=True, type=Path)
+    parser.add_argument("--evidence-manifest", required=True, type=Path)
     parser.add_argument("--style", type=Path, default=DEFAULT_STYLE)
     args = parser.parse_args()
     try:
-        result = finish(args.task_dir, style_path=args.style.expanduser().resolve())
-    except (FinishError, TimelineError, OSError) as exc:
+        result = finish(
+            args.task_dir,
+            repair_plan_path=args.repair_plan,
+            evidence_manifest_path=args.evidence_manifest,
+            style_path=args.style.expanduser().resolve(),
+        )
+    except (FinishError, TimelineError, RepairPlanError, OSError) as exc:
         print(json.dumps({"status": "FAIL", "error": str(exc)}, ensure_ascii=False, indent=2))
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))

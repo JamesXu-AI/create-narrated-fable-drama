@@ -2,6 +2,11 @@
 
 Design camera coverage around power, information, and performance. Preserve a reconstructable room and a stable eye line through every generated segment.
 
+The default frame contains the fewest story-active characters: one expressive
+subject or one speaker/listener pair. A physically present third role normally
+stays outside the crop and remains continuous through its mark, gaze, off-screen
+sound, foreground edge, or later reaction. Do not widen to prove presence.
+
 ## Contents
 
 - [Establish the spatial contract](#establish-the-spatial-contract)
@@ -49,6 +54,7 @@ window side of the axis. The door is behind CHEN; the red folder remains by LIN'
 ```
 
 Do not let a reverse shot mirror the whole world. Only the subject changes; geography, screen sides, props, light direction, and eye-line logic remain consistent.
+This spatial contract is mandatory even when no master Shot appears on screen.
 
 ## Derive action and orientation from drama
 
@@ -121,7 +127,7 @@ Use each angle for a reason:
 
 | Coverage | Primary job | Best use |
 |---|---|---|
-| Master/wide two-shot | Geography and shared action | Entrances, movement, handoffs, power distance |
+| Brief master/wide two-shot | Position change only | Entrance, exit, crossing, mark handoff, consequential distance change |
 | Medium two-shot | Relationship and simultaneous listening | Fast exchange, intimacy, comedy timing |
 | OTS on speaker | Keeps listener physically present | Negotiation, confrontation, unequal power |
 | Clean single | Isolates inner tactic or confession | Decisive line, concealment, emotional separation |
@@ -132,10 +138,12 @@ Use each angle for a reason:
 Use close and medium-close coverage as the dialogue baseline when the story event
 lives in delivery, listening, eye line, breath, concealment, recognition, or a
 small physical action. A close-up still needs a precise attention target; do not
-use one as empty emphasis. Conversely, a master/wide must earn its space through
-new geography, shared action, entrance/exit travel, or a relationship-distance
-change. Physical presence and continuity alone do not justify returning to a
-full-cast master.
+use one as empty emphasis. A master/wide is a `position-change exception:` and may
+exist only for the shortest readable portion of a story-required entrance, exit,
+crossing, approach, retreat, transfer between marks, or consequential
+relationship-distance change. It returns immediately to the decisive close-up.
+New geography, atmosphere, scale, physical presence, and continuity alone do not
+justify a full-cast master.
 
 ## Shot/reverse-shot contract
 
@@ -247,6 +255,12 @@ Use one primary camera idea per timed beat. Avoid close facial dialogue with wid
 - Favor stable medium-close and close singles for sustained spoken lines and
   listener reactions; use medium framing when shared gesture or relationship
   distance must remain readable.
+- Keep visible independent performers to one or two unless the current causal
+  action truly requires more; crop other still-present roles without treating
+  them as absent.
+- Label any MWS/WS/EWS beat `position-change exception:` and keep only the
+  movement from start mark through landing mark before returning to tight
+  attention.
 - Reserve extreme close-ups for short, controlled performance moments.
 - Keep mouth, chin, and jaw visible when lip-sync is essential.
 - Avoid foreground occlusion across the mouth during critical dialogue.
@@ -283,3 +297,8 @@ Mark `BLOCKER` when:
 - Dialogue is covered mainly by repeated frontal masters or full-cast wide shots
   even though delivery, listening, eye line, or small reactions own the dramatic
   changes.
+- An interaction lacks a declared A/B axis, screen sides, opposing look
+  directions, or camera side; a reverse mirrors or silently crosses that axis.
+- A wider Shot does not show a consequential position change, lasts beyond the
+  readable landing, or is followed by another wider Shot instead of a tight
+  dramatic subject.

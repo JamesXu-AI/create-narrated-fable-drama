@@ -23,6 +23,56 @@ def _prompt_dialogue_blocks(text: str) -> list[str]:
     return re.findall(r"\{([^{}]+)\}", text)
 
 
+def _validate_visual_doctrine(prompt: str, row: dict[str, Any]) -> None:
+    contract = row["prompt_contract"]
+    required_declarations = {
+        "Visible-character economy:": contract["visible_character_economy_en"],
+        "Eyeline axis and screen direction:": contract[
+            "eyeline_axis_and_screen_direction_en"
+        ],
+        "Close-up-led coverage:": contract["shot_size_policy"],
+    }
+    for label, authority in required_declarations.items():
+        if label.casefold() not in prompt.casefold() or authority not in prompt:
+            raise SegmentRuntimeError(
+                f"{row['segment_id']} Prompt must copy the Storyboard declaration "
+                f"{label}"
+            )
+
+    shot_matches = list(
+        re.finditer(
+            r"^(?:#{1,6}\s*)?Shot ([1-9][0-9]*): "
+            r"(extreme_close_up|close_up|medium_close_up|medium|"
+            r"medium_wide|wide|extreme_wide)\.",
+            prompt,
+            re.IGNORECASE | re.MULTILINE,
+        )
+    )
+    expected_sizes = [shot[2] for shot in row["ordered_shots"]]
+    actual = [(int(match.group(1)), match.group(2).casefold()) for match in shot_matches]
+    expected = list(enumerate(expected_sizes, start=1))
+    if actual != expected:
+        raise SegmentRuntimeError(
+            f"{row['segment_id']} Prompt Shot headings must exactly preserve "
+            "'Shot N: <Storyboard shot_size>.' in order"
+        )
+    wide_sizes = {"medium_wide", "wide", "extreme_wide"}
+    for index, match in enumerate(shot_matches):
+        if match.group(2).casefold() not in wide_sizes:
+            continue
+        end = (
+            shot_matches[index + 1].start()
+            if index + 1 < len(shot_matches)
+            else len(prompt)
+        )
+        shot_block = prompt[match.end() : end]
+        if "position-change exception:" not in shot_block.casefold():
+            raise SegmentRuntimeError(
+                f"{row['segment_id']} Shot {index + 1} wider framing lacks the "
+                "literal position-change exception"
+            )
+
+
 def _validate_prompt(text: str, row: dict[str, Any], path: Path) -> str:
     prompt = text.strip()
     if not prompt:
@@ -52,6 +102,7 @@ def _validate_prompt(text: str, row: dict[str, Any], path: Path) -> str:
         raise SegmentRuntimeError(
             f"{row['segment_id']} Prompt requests generated subtitles or text"
         )
+    _validate_visual_doctrine(prompt, row)
     dialogue_blocks = _prompt_dialogue_blocks(prompt)
     for cue in row["dialogue_cues"]:
         exact = cue["exact_text"]
@@ -110,4 +161,3 @@ def parse_segment_script(path: Path) -> dict[str, Any]:
         "prompt": prompt,
         "bindings": row["bindings"],
     }
-

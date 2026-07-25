@@ -13,7 +13,6 @@ from .common import (
     DEPARTMENT_DIRNAME,
     FAILED_ATTEMPT_RE,
     GENERATION_DIRNAME,
-    MAX_PROVIDER_ATTEMPTS,
     PENDING_DIRNAME,
     PROVIDER_ATTEMPTS_DIRNAME,
     TERMINAL_STATES,
@@ -41,20 +40,7 @@ def _archive_failed_attempt(
         raise SegmentGenerationError(
             f"{segment_id} failed-attempt archive already exists: {archive_dir.name}"
         )
-    submission_path = active_dir / "submission.json"
-    submission = read_json(submission_path) if submission_path.is_file() else {}
-    write_json(
-        active_dir / "failure-record.json",
-        {
-            "contract": "seedance-failed-attempt",
-            "segment_id": segment_id,
-            "attempt_number": attempt_number,
-            "provider_task_id": submission.get("provider_task_id"),
-            "provider_status": submission.get("status"),
-            "request_sha256": submission.get("request_sha256"),
-        },
-    )
-    submission_path.unlink(missing_ok=True)
+    (active_dir / "submission.json").unlink(missing_ok=True)
     (active_dir / "production-record.json").unlink(missing_ok=True)
     active_dir.replace(archive_dir)
     return archive_dir
@@ -251,11 +237,6 @@ def generate_one(
                 )
             announce(f"RESUME {segment_id} task={task_id}")
     if submission is None:
-        if not 1 <= attempt_number <= MAX_PROVIDER_ATTEMPTS:
-            raise SegmentGenerationError(
-                f"{segment_id} reached the maximum of "
-                f"{MAX_PROVIDER_ATTEMPTS} human-confirmed attempts."
-            )
         active_dir.mkdir(parents=False, exist_ok=False)
         try:
             response = seedance.create_video_task(request, timeout=request_timeout)

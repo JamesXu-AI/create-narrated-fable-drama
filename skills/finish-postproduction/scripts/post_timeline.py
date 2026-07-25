@@ -8,9 +8,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from narrated_fable_drama.contracts.boundary import (
-    build_story_plan_boundaries,
-)
+from narrated_fable_drama.contracts.boundary import classify_boundary
 from narrated_fable_drama.contracts.screenplay import load_screenplay_file
 from narrated_fable_drama.contracts.segment import (
     load_execution_plan,
@@ -18,7 +16,6 @@ from narrated_fable_drama.contracts.segment import (
     sha256_json,
     storyboard_segment_rows,
 )
-from narrated_fable_drama.contracts.segment.handoff import load_segment_handoff
 from narrated_fable_drama.core.json_io import load_json_object, write_json_atomic
 from narrated_fable_drama.core.project_context import load_project_context
 from narrated_fable_drama.media.ffmpeg import MediaCommandError
@@ -27,12 +24,10 @@ from narrated_fable_drama.media.probe import (
     probe_json,
     stream_by_type,
 )
+from finishing.plan import materialize_kept_ranges
 
 SEGMENT_RE = re.compile(r"^segment-([0-9]{3})$")
 MAX_FINAL_RUNTIME_SECONDS = 240.0
-SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES = 6
-SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES = 1
-TERMINAL_AUDIO_FADE_SECONDS = 0.12
 
 
 class TimelineError(RuntimeError):
@@ -114,11 +109,35 @@ def _validate_project_audio(task_dir: Path) -> dict[str, Any]:
     return context
 
 
-def discover_segments(task_dir: Path) -> list[SegmentRecord]:
+def discover_segments(
+    task_dir: Path,
+    *,
+    validation_through_segment_id: str | None = None,
+    allow_stale_preview: bool = False,
+) -> list[SegmentRecord]:
     task_dir = task_dir.expanduser().resolve()
+    if allow_stale_preview and validation_through_segment_id is None:
+        raise TimelineError(
+            "Stale-source inspection is allowed only for an explicit preview prefix"
+        )
     _validate_project_audio(task_dir)
     story_plans, _ = _screenplay_story_plans(task_dir)
-    expected = [str(item["segment_id"]) for item in storyboard_segment_rows(task_dir)]
+    if validation_through_segment_id is not None:
+        story_ids = [str(item["segment_id"]) for item in story_plans]
+        if validation_through_segment_id not in story_ids:
+            raise TimelineError(
+                f"Unknown validation Segment ID: {validation_through_segment_id}"
+            )
+        story_plans = story_plans[
+            : story_ids.index(validation_through_segment_id) + 1
+        ]
+    expected = [
+        str(item["segment_id"])
+        for item in storyboard_segment_rows(
+            task_dir,
+            validation_through_segment_id=validation_through_segment_id,
+        )
+    ]
     if [item["segment_id"] for item in story_plans] != expected:
         raise TimelineError(
             "screenplay.md Segment order differs from the Storyboard Generation Plan"
@@ -132,6 +151,13 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
         item.name for item in media_root.iterdir() if item.is_dir() and SEGMENT_RE.fullmatch(item.name)
     )
     actual_scripts = sorted(path.stem for path in scripts_root.glob("segment-*.md"))
+    if validation_through_segment_id is not None:
+        actual_media = [
+            item for item in actual_media if item <= validation_through_segment_id
+        ]
+        actual_scripts = [
+            item for item in actual_scripts if item <= validation_through_segment_id
+        ]
     if actual_media != expected or actual_scripts != expected:
         raise TimelineError("Segment media/Script coverage differs from screenplay.md")
     records: list[SegmentRecord] = []
@@ -160,7 +186,7 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
             raise TimelineError(f"{segment_name} production attempt identity is stale")
         parsed_script = parse_segment_script(script)
         execution_plan = load_execution_plan(task_dir, segment_name)
-        if (
+        if not allow_stale_preview and (
             production_record.get("segment_prompt_sha256")
             != parsed_script["script_sha256"]
             or production_record.get("seedance_execution_plan_sha256")
@@ -192,89 +218,9 @@ def discover_segments(task_dir: Path) -> list[SegmentRecord]:
     return records
 
 
-def _dialogue_cues(handoff: dict[str, Any]) -> list[dict[str, Any]]:
-    return [
-        cue
-        for block in handoff.get("timeline_blocks", [])
-        if isinstance(block, dict)
-        for cue in block.get("dialogue_cues", [])
-        if isinstance(cue, dict)
-    ]
-
-
-def _source_windows(
-    records: list[SegmentRecord],
-    handoffs: dict[str, dict[str, Any]],
-) -> tuple[list[dict[str, float]], dict[tuple[str, str], dict[str, Any]]]:
-    """Plan the official 6-frame/1-frame Seedance extension seam cleanup."""
-
-    windows = [
-        {"source_in_seconds": 0.0, "source_out_seconds": record.probe.duration_seconds}
-        for record in records
-    ]
-    seam_trims: dict[tuple[str, str], dict[str, Any]] = {}
-    for index in range(1, len(records)):
-        incoming = records[index]
-        if incoming.fields.get("operation") != "video_extension":
-            continue
-        outgoing = records[index - 1]
-        outgoing_fps = _fraction_as_float(outgoing.probe.frame_rate)
-        incoming_fps = _fraction_as_float(incoming.probe.frame_rate)
-        outgoing_trim = SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES / outgoing_fps
-        incoming_trim = SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES / incoming_fps
-        outgoing_handoff = handoffs.get(outgoing.segment_name)
-        incoming_handoff = handoffs.get(incoming.segment_name)
-        if not isinstance(outgoing_handoff, dict) or not isinstance(incoming_handoff, dict):
-            raise TimelineError(
-                f"Missing Segment handoff for extension seam "
-                f"{outgoing.segment_name}->{incoming.segment_name}"
-            )
-        safe = outgoing_handoff.get("segment_safe_cut_design")
-        available_hold = (
-            float(safe.get("editable_hold_seconds", -1))
-            if isinstance(safe, dict)
-            else -1.0
-        )
-        if available_hold + 1e-6 < outgoing_trim:
-            raise TimelineError(
-                f"{outgoing.segment_name} provides {available_hold:.3f}s editable hold, "
-                f"but its Seedance extension seam needs {outgoing_trim:.3f}s for six frames"
-            )
-        outgoing_cut = windows[index - 1]["source_out_seconds"] - outgoing_trim
-        incoming_cut = windows[index]["source_in_seconds"] + incoming_trim
-        if outgoing_cut <= windows[index - 1]["source_in_seconds"] or incoming_cut >= windows[index]["source_out_seconds"]:
-            raise TimelineError(
-                f"Seedance extension seam trim would consume a complete Segment at "
-                f"{outgoing.segment_name}->{incoming.segment_name}"
-            )
-        outgoing_dialogue = _dialogue_cues(outgoing_handoff)
-        incoming_dialogue = _dialogue_cues(incoming_handoff)
-        if any(float(cue["end_seconds"]) > outgoing_cut + 1e-6 for cue in outgoing_dialogue):
-            raise TimelineError(
-                f"{outgoing.segment_name} dialogue overlaps the required six-frame extension trim"
-            )
-        if any(float(cue["start_seconds"]) < incoming_cut - 1e-6 for cue in incoming_dialogue):
-            raise TimelineError(
-                f"{incoming.segment_name} dialogue overlaps the required one-frame extension trim"
-            )
-        windows[index - 1]["source_out_seconds"] = outgoing_cut
-        windows[index]["source_in_seconds"] = incoming_cut
-        seam_trims[(outgoing.segment_name, incoming.segment_name)] = {
-            "policy": "seedance_extension_6_tail_frames_1_head_frame",
-            "outgoing_trim_frames": SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES,
-            "incoming_trim_frames": SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES,
-            "outgoing_trim_seconds": round(outgoing_trim, 6),
-            "incoming_trim_seconds": round(incoming_trim, 6),
-            "outgoing_source_out_seconds": round(outgoing_cut, 6),
-            "incoming_source_in_seconds": round(incoming_cut, 6),
-            "dialogue_clear": True,
-            "editable_hold_verified": True,
-        }
-    return windows, seam_trims
-
-
 def compile_timelines(
     task_dir: Path,
+    repair_plan: dict[str, Any],
     records: list[SegmentRecord] | None = None,
     *,
     runtime_limit_seconds: float = MAX_FINAL_RUNTIME_SECONDS,
@@ -287,23 +233,33 @@ def compile_timelines(
     native_events: list[dict[str, Any]] = []
     boundaries: list[dict[str, Any]] = []
     story_plans, authored_boundaries = _screenplay_story_plans(task_dir)
-    plan_boundaries = build_story_plan_boundaries(
-        story_plans, authored_boundaries
-    )
-    storyboards = load_segment_handoff(task_dir)
-    source_windows, seam_trims = _source_windows(records, storyboards)
+    if len(authored_boundaries) != max(0, len(records) - 1):
+        raise TimelineError("Authored boundary coverage differs from current media")
+    segment_plans = repair_plan["segments"]
+    model_boundaries = repair_plan["boundaries"]
+    if (
+        [item["segment_id"] for item in segment_plans]
+        != [record.segment_name for record in records]
+        or len(model_boundaries) != max(0, len(records) - 1)
+    ):
+        raise TimelineError("Model repair-plan coverage differs from current media")
     cursor = 0.0
     for index, record in enumerate(records):
-        source_in = source_windows[index]["source_in_seconds"]
-        source_out = source_windows[index]["source_out_seconds"]
-        duration = source_out - source_in
-        incoming_execution = (
-            plan_boundaries[index - 1]["execution"] if index else None
+        segment_plan = segment_plans[index]
+        picture_plan = segment_plan["picture"]
+        audio_plan = segment_plan["audio"]
+        source_in = float(picture_plan["source_in_seconds"])
+        source_out = float(picture_plan["source_out_seconds"])
+        picture_ranges = materialize_kept_ranges(picture_plan)
+        duration = sum(
+            float(item["source_out_seconds"])
+            - float(item["source_in_seconds"])
+            for item in picture_ranges
         )
+        incoming_boundary = model_boundaries[index - 1] if index else None
         incoming_overlap = (
-            float(incoming_execution["transition_duration_seconds"])
-            if incoming_execution is not None
-            and incoming_execution["picture_edit_mode"] in {"dissolve", "fade"}
+            float(incoming_boundary["picture"]["overlap_seconds"])
+            if incoming_boundary is not None
             else 0.0
         )
         if incoming_overlap < 0 or incoming_overlap >= duration:
@@ -317,6 +273,8 @@ def compile_timelines(
             "source": str(record.video_path),
             "source_in_seconds": round(source_in, 6),
             "source_out_seconds": round(source_out, 6),
+            "source_ranges": picture_ranges,
+            "removed_intervals": picture_plan["removed_intervals"],
             "timeline_in_seconds": round(start, 6),
             "timeline_out_seconds": round(end, 6),
             "duration_seconds": round(duration, 6),
@@ -325,17 +283,42 @@ def compile_timelines(
             {
                 **common,
                 "edit": (
-                    incoming_execution["picture_edit_mode"]
-                    if incoming_execution is not None
+                    incoming_boundary["picture"]["operation"]
+                    if incoming_boundary is not None
                     else "opening"
                 ),
                 "script": str(record.script_path),
+                "color_adjustments": picture_plan["color_adjustments"],
+                "model_reason": segment_plan["reason"],
             }
         )
+        audio_source_in = float(audio_plan["source_in_seconds"])
+        audio_source_out = float(audio_plan["source_out_seconds"])
+        audio_ranges = materialize_kept_ranges(audio_plan)
+        audio_start = start + float(
+            audio_plan["timeline_offset_from_picture_in_seconds"]
+        )
+        audio_duration = sum(
+            float(item["source_out_seconds"])
+            - float(item["source_in_seconds"])
+            for item in audio_ranges
+        )
+        if audio_start < -1e-6:
+            raise TimelineError(
+                f"{record.segment_name} audio begins before the final timeline"
+            )
         native_events.append(
             {
-                **common,
                 "event_id": f"native-{record.segment_name}",
+                "segment_id": record.segment_name,
+                "source": str(record.video_path),
+                "source_in_seconds": round(audio_source_in, 6),
+                "source_out_seconds": round(audio_source_out, 6),
+                "source_ranges": audio_ranges,
+                "removed_intervals": audio_plan["removed_intervals"],
+                "timeline_in_seconds": round(audio_start, 6),
+                "timeline_out_seconds": round(audio_start + audio_duration, 6),
+                "duration_seconds": round(audio_duration, 6),
                 "purpose": "seedance_native_dialogue_foley_ambience_and_background_music",
                 "has_source_audio": True,
                 "voice_audio_source": "speaker_reference_audio",
@@ -344,91 +327,116 @@ def compile_timelines(
                 "background_music_source": "seedance_native",
                 "seedance_background_music": True,
                 "preserve_lip_sync": True,
-                "cross_boundary_copy_allowed": False,
-                "transition_overlap_allowed": incoming_overlap > 0,
-                "gain_db": 0.0,
-                "terminal_audio_fade_seconds": (
-                    TERMINAL_AUDIO_FADE_SECONDS if index == len(records) - 1 else 0.0
-                ),
+                "gain_db": audio_plan["gain_db"],
+                "fade_in_seconds": audio_plan["fade_in_seconds"],
+                "fade_out_seconds": audio_plan["fade_out_seconds"],
+                "gain_adjustments": audio_plan["gain_adjustments"],
             }
         )
         if index + 1 < len(records):
-            boundary_plan = plan_boundaries[index]
-            execution = boundary_plan["execution"]
-            overlap = (
-                float(execution["transition_duration_seconds"])
-                if execution["picture_edit_mode"] in {"dissolve", "fade"}
-                else 0.0
+            boundary_plan = model_boundaries[index]
+            authored = authored_boundaries[index]
+            successor = story_plans[index + 1]
+            predecessor = story_plans[index]
+            if (
+                authored.get("from_segment_id") != record.segment_name
+                or authored.get("to_segment_id") != records[index + 1].segment_name
+                or boundary_plan.get("from") != record.segment_name
+                or boundary_plan.get("to") != records[index + 1].segment_name
+            ):
+                raise TimelineError("Boundary order differs between authored and model plans")
+            overlap = float(boundary_plan["picture"]["overlap_seconds"])
+            picture_operation = str(boundary_plan["picture"]["operation"])
+            transition_class = classify_boundary(
+                transition_type=str(authored["transition_type"]),
+                from_scene_id=str(predecessor["scene_id"]),
+                to_scene_id=str(successor["scene_id"]),
+                successor_incoming_visual_requirement=str(authored["handoff"]),
             )
-            if overlap:
-                try:
-                    storyboard = storyboards[record.segment_name]
-                except KeyError as exc:
-                    raise TimelineError(
-                        f"{record.segment_name} is absent from the Segment handoff"
-                    ) from exc
-                safe = storyboard.get("segment_safe_cut_design")
-                available = (
-                    float(safe.get("editable_hold_seconds", -1))
-                    if isinstance(safe, dict)
-                    else -1
-                )
-                if available + 1e-6 < overlap:
-                    raise TimelineError(
-                        f"{record.segment_name} provides {available:.3f}s transition "
-                        f"handle but {execution['authored_transition_type']} requires "
-                        f"{overlap:.3f}s"
-                    )
             boundary = {
                     "from": record.segment_name,
                     "to": records[index + 1].segment_name,
-                    "authored_transition_type": execution[
-                        "authored_transition_type"
-                    ],
-                    "transition_class": execution["transition_class"],
+                    "boundary_id": boundary_plan["boundary_id"],
+                    "authored_transition_type": authored["transition_type"],
+                    "authored_audio_handoff": authored["audio_handoff"],
+                    "transition_class": transition_class,
                     "timeline_seconds": round(end - overlap, 6),
                     "transition_start_seconds": round(end - overlap, 6),
                     "transition_end_seconds": round(end, 6),
-                    "picture_edit": execution["picture_edit_mode"],
-                    "audio_edit": execution["audio_edit_mode"],
-                    "audio_edge_fade_seconds": execution[
-                        "audio_edge_fade_seconds"
+                    "picture_edit": picture_operation,
+                    "audio_edit": boundary_plan["audio"]["operation"],
+                    "outgoing_audio_fade_seconds": boundary_plan["audio"][
+                        "outgoing_fade_out_seconds"
+                    ],
+                    "incoming_audio_fade_seconds": boundary_plan["audio"][
+                        "incoming_fade_in_seconds"
                     ],
                     "overlap_seconds": round(overlap, 6),
+                    "outgoing_source_out_seconds": round(source_out, 6),
+                    "incoming_source_in_seconds": round(
+                        float(
+                            segment_plans[index + 1]["picture"][
+                                "source_in_seconds"
+                            ]
+                        ),
+                        6,
+                    ),
+                    "decision": boundary_plan["decision"],
+                    "scope": boundary_plan["scope"],
+                    "modification_intervals": boundary_plan[
+                        "modification_intervals"
+                    ],
+                    "model_reason": boundary_plan["reason"],
                 }
-            seam_trim = seam_trims.get(
-                (record.segment_name, records[index + 1].segment_name)
-            )
-            if seam_trim is not None:
-                boundary["seedance_extension_trim"] = seam_trim
-                boundary["outgoing_source_out_seconds"] = seam_trim[
-                    "outgoing_source_out_seconds"
-                ]
-                boundary["incoming_source_in_seconds"] = seam_trim[
-                    "incoming_source_in_seconds"
-                ]
             boundaries.append(boundary)
         cursor = end
     if cursor > runtime_limit_seconds + 1e-6:
         raise TimelineError(
             f"Final runtime {cursor:.3f}s exceeds {runtime_limit_seconds:.3f}s"
         )
+    bridge_events = []
+    for bridge in repair_plan["audio_bridges"]:
+        source_record = next(
+            record
+            for record in records
+            if record.segment_name == bridge["source_segment_id"]
+        )
+        source_duration = float(bridge["source_out_seconds"]) - float(
+            bridge["source_in_seconds"]
+        )
+        bridge_events.append(
+            {
+                **bridge,
+                "source": str(source_record.video_path),
+                "timeline_out_seconds": round(
+                    float(bridge["timeline_in_seconds"]) + source_duration,
+                    6,
+                ),
+                "duration_seconds": round(source_duration, 6),
+            }
+        )
+    last_audio_end = max(
+        [
+            *(float(event["timeline_out_seconds"]) for event in native_events),
+            *(float(event["timeline_out_seconds"]) for event in bridge_events),
+        ]
+    )
+    if last_audio_end + 1e-6 < cursor:
+        raise TimelineError(
+            "Explicit audio events end before picture; automatic silence padding is forbidden"
+        )
+
     picture_edl = {
-        "contract": "finish-picture-audio-edl",
-        "edit_policy": "authored_semantic_boundaries",
+        "contract": "finish-picture-audio-edl/v2",
+        "edit_policy": "model_authored_from_real_media_evidence",
+        "repair_plan_contract": repair_plan["contract"],
         "segment_count": len(records),
         "duration_seconds": round(cursor, 6),
         "picture_events": picture_events,
         "boundaries": boundaries,
-        "seedance_extension_trim_policy": {
-            "enabled": True,
-            "outgoing_tail_frames": SEEDANCE_EXTENSION_OUTGOING_TRIM_FRAMES,
-            "incoming_head_frames": SEEDANCE_EXTENSION_INCOMING_TRIM_FRAMES,
-            "applied_boundary_count": len(seam_trims),
-        },
     }
     audio_timeline = {
-        "contract": "finish-native-audio-timeline",
+        "contract": "finish-native-audio-timeline/v2",
         "duration_seconds": round(cursor, 6),
         "native_audio_policy": {
             "generate_audio": True,
@@ -438,10 +446,9 @@ def compile_timelines(
             "seedance_background_music": True,
             "background_music_source": "seedance_native",
             "preserve_clip_sync": True,
-            "cross_segment_native_audio": any(
-                boundary["overlap_seconds"] > 0 for boundary in boundaries
-            ),
-            "terminal_fade_seconds": TERMINAL_AUDIO_FADE_SECONDS,
+            "automatic_silence_padding": False,
+            "model_authored_event_placement": True,
+            "terminal_audio": repair_plan["terminal_audio"],
         },
         "tracks": [
             {
@@ -451,6 +458,7 @@ def compile_timelines(
                 "events": native_events,
             }
         ],
+        "audio_bridges": bridge_events,
         "music_provider": "seedance",
         "seedance_background_music": True,
         "background_music_source": "seedance_native",

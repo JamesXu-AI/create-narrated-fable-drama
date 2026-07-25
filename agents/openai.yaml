@@ -1,4 +1,4 @@
 interface:
   display_name: "Narrated Fable Drama"
   short_description: "Turn a Story into a guided 16:9 narrated fable drama"
-  default_prompt: "Use $create-narrated-fable-drama to turn my Story into a 16:9 narrated fable drama, require a target country, use my conversational style/resolution or default to 3D Healing Animation at 1080p, run full speech-rate gates after screenplay, Storyboard, and the complete first Prompt set, then begin one-Segment-at-a-time human confirmation."
+  default_prompt: "Use $create-narrated-fable-drama to turn my Story into a 16:9 narrated fable drama, require a target country, use my conversational style/resolution or default to 3D Healing Animation at 1080p, keep visible characters to the minimum story-active subject or speaker/listener pair, declare and preserve the eyeline axis and screen directions, make ECU/CU/MCU dominant, allow only the shortest wider view needed to show a story-required position change before returning tight, run the full screenplay/Storyboard/Prompt gates, then begin one-Segment-at-a-time human confirmation."
