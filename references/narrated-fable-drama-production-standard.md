@@ -39,6 +39,10 @@ story, performance, speech, camera, or continuity authority.
   authored music are generated as synchronized Seedance-native audio.
 - Generated subtitles and on-screen transcription are forbidden. Captions belong
   to postproduction.
+- Postproduction captions copy exact text and speaker order from the Storyboard,
+  but derive their final appearance times from word-level alignment against the
+  completed clean master's native audio. Missing or low-coverage alignment blocks
+  delivery; nominal Storyboard speech windows are never a release fallback.
 - Total runtime must not exceed 240 seconds.
 
 The target country is mandatory. If it is missing from the conversation, stop and

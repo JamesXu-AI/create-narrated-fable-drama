@@ -9,6 +9,8 @@ from typing import Any
 
 from narrated_fable_drama.core.json_io import write_json_atomic
 from narrated_fable_drama.core.project_context import load_project_context
+
+from .subtitle_alignment import sha256_file
 from .subtitle_compile import compile_cues
 from .subtitle_files import (
     _write_subtitle_files,
@@ -84,13 +86,25 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
         manifest = {
             "contract": "finish-final-delivery",
             "state": "FINAL_MASTER_READY",
-            "clean_master": {"path": str(clean.resolve())},
-            "captioned_master": {"path": str(captioned.resolve())},
+            "clean_master": {
+                "path": str(clean.resolve()),
+                "sha256": sha256_file(clean),
+            },
+            "captioned_master": {
+                "path": str(captioned.resolve()),
+                "sha256": sha256_file(captioned),
+            },
             "subtitles": {
                 "cue_count": authority["cue_count"],
                 "cues_path": str(cues_path.resolve()),
+                "cues_sha256": sha256_file(cues_path),
                 "srt_path": str(srt_path.resolve()),
+                "srt_sha256": sha256_file(srt_path),
                 "vtt_path": str(vtt_path.resolve()),
+                "vtt_sha256": sha256_file(vtt_path),
+                "text_authority": authority["text_authority"],
+                "timing_authority": authority["timing_authority"],
+                "alignment_evidence": authority["alignment_evidence"],
             },
             "duration_seconds": round(clean_probe["duration_seconds"], 3),
             "resolution": {
@@ -122,7 +136,9 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
             },
             "clean_captioned_duration_match": True,
         }
-        manifest_path = task_dir / "finish-postproduction" / "final-delivery-manifest.json"
+        manifest_path = (
+            task_dir / "finish-postproduction" / "final-delivery-manifest.json"
+        )
         write_json_atomic(manifest_path, manifest, sort_keys=True)
         result.update(
             {
@@ -142,13 +158,22 @@ def main() -> int:
     parser.add_argument(
         "--render-captioned",
         action="store_true",
-        help="Render final-clean-master.mp4 and final-captioned-master.mp4 after subtitle compilation.",
+        help=(
+            "Render final-clean-master.mp4 and final-captioned-master.mp4 "
+            "after subtitle compilation."
+        ),
     )
     args = parser.parse_args()
     try:
         result = build(args.task_dir, args.style, render=args.render_captioned)
     except Exception as exc:
-        print(json.dumps({"status": "FAIL", "error": str(exc)}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"status": "FAIL", "error": str(exc)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

@@ -7,6 +7,9 @@ name = "create-narrated-fable-drama"
 version = "1.0.0"
 description = "Repository-local production workflow for 16:9 narrated fable dramas."
 requires-python = ">=3.11"
+dependencies = [
+  "faster-whisper>=1.2,<2",
+]
 
 [project.scripts]
 narrated-fable-drama = "narrated_fable_drama.cli:main"

@@ -108,13 +108,19 @@ python3 skills/finish-postproduction/scripts/finish_postproduction.py \
 
 ## Subtitles
 
-`load_segment_handoff` derives exact line text and Segment-local timing directly
-from Storyboard Ordered Shots. ASR is never text authority.
+`load_segment_handoff` derives exact line text and speaker order directly from
+Storyboard Ordered Shots. The final clean master's native audio is the mandatory
+timing source: align every authoritative line to measured word timestamps after
+all picture and audio edits are complete. ASR is timing evidence only and is never
+text authority.
 
 Each line appears once, in order, under the correct speaker. Wrapping may change
 whitespace only. A long cue may split into ordered display events only if normalized
 concatenation recreates the exact text. Caption timing may extend into adjacent
 silence inside the same Segment but may not overlap another line or change audio.
+Missing final audio, an unavailable alignment model, low token coverage, or an
+alignment outside the owning Segment blocks delivery. Never fall back to
+Storyboard speech windows or editorial timing overrides.
 
 ## Deliver
 

@@ -45,14 +45,20 @@ adds a terminal fade.
 ## Subtitle chain
 
 ```text
-Storyboard exact line + local window
--> picture EDL Segment offset
+Storyboard exact line + final clean master native audio
+-> measured word-timestamp alignment
+-> picture/audio EDL ownership validation
 -> subtitle-cues.json + SRT + VTT
 -> captioned master
 ```
 
-ASR is never authority. Every Storyboard line appears once in order. Display-time
-adjustments remain inside the owning Segment and never change native audio.
+The Storyboard remains the sole text, speaker, and line-order authority. ASR is
+timing evidence only. Every Storyboard line appears once in order, and the
+alignment record includes the clean-master path and content hash. Missing audio,
+an unavailable model, low-confidence coverage, or a cue outside its owning
+Segment blocks delivery; there is no fallback to nominal Storyboard speech
+windows or source-window timing overrides. Display-time adjustments remain
+inside the owning Segment and never change native audio.
 
 ## Delivery
 

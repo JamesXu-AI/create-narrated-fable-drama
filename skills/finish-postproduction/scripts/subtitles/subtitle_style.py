@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
-import re
 from typing import Any
 
 from narrated_fable_drama.core.json_io import load_json_object
 from narrated_fable_drama.core.paths import ProjectPaths
-
 
 SKILL_ROOT = (
     ProjectPaths.resolve(Path(__file__)).repository_root
@@ -23,6 +22,18 @@ STYLE_KEYS = {
     "contract",
     "text_authority",
     "timing_authority",
+    "alignment_model_family",
+    "alignment_device",
+    "alignment_compute_type",
+    "alignment_beam_size",
+    "alignment_vad_filter",
+    "minimum_alignment_token_coverage",
+    "minimum_alignment_token_similarity",
+    "alignment_token_lookahead",
+    "alignment_outlier_gap_seconds",
+    "alignment_outlier_probability_threshold",
+    "subtitle_lead_in_seconds",
+    "subtitle_trail_out_seconds",
     "max_lines",
     "max_characters_per_line_cjk",
     "max_characters_per_line_latin",
@@ -59,7 +70,11 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _number(value: Any, label: str, *, minimum: float = 0.0) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < minimum:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or value < minimum
+    ):
         raise SubtitleBuildError(f"{label} must be numeric and >= {minimum}.")
     return float(value)
 
@@ -77,10 +92,41 @@ def _validate_style(style: dict[str, Any]) -> None:
         )
     if (
         style["timing_authority"]
-        != "storyboard_speech_windows_plus_picture_edl"
+        != "final_clean_master_word_alignment"
     ):
         raise SubtitleBuildError("Subtitle timing authority is invalid.")
     for field in (
+        "alignment_model_family",
+        "alignment_device",
+        "alignment_compute_type",
+    ):
+        if not isinstance(style[field], str) or not style[field].strip():
+            raise SubtitleBuildError(f"subtitle style {field} must be non-empty.")
+    for field in ("alignment_beam_size", "alignment_token_lookahead"):
+        if (
+            isinstance(style[field], bool)
+            or not isinstance(style[field], int)
+            or style[field] < 1
+        ):
+            raise SubtitleBuildError(
+                f"subtitle style {field} must be a positive integer."
+            )
+    for field in (
+        "minimum_alignment_token_coverage",
+        "minimum_alignment_token_similarity",
+        "alignment_outlier_probability_threshold",
+    ):
+        value = _number(style[field], field)
+        if value > 1:
+            raise SubtitleBuildError(f"subtitle style {field} must be <= 1.")
+    for field in (
+        "alignment_outlier_gap_seconds",
+        "subtitle_lead_in_seconds",
+        "subtitle_trail_out_seconds",
+    ):
+        _number(style[field], field)
+    for field in (
+        "alignment_vad_filter",
         "shadow",
         "background_box",
         "speaker_labels",
@@ -210,7 +256,10 @@ def _split_oversized_unit(
     target_units = len(units) / screen_count
 
     @lru_cache(maxsize=None)
-    def balanced_split(cursor: int, screens_left: int) -> tuple[float, tuple[int, ...]] | None:
+    def balanced_split(
+        cursor: int,
+        screens_left: int,
+    ) -> tuple[float, tuple[int, ...]] | None:
         if screens_left == 0:
             return (0.0, ()) if cursor == len(units) else None
         last_end = len(units) - (screens_left - 1)
@@ -344,7 +393,8 @@ def _caption_intervals(
     durations = [duration * weight / total_weight for weight in weights]
     if any(value + 1e-6 < minimum_duration for value in durations):
         raise SubtitleBuildError(
-            "Exact subtitle needs multiple screens but its authored interval is too short."
+            "Exact subtitle needs multiple screens but its authored interval "
+            "is too short."
         )
     intervals: list[tuple[float, float]] = []
     cursor = start
@@ -493,7 +543,9 @@ def _picture_events(edl: dict[str, Any]) -> dict[str, dict[str, Any]]:
         overlap = 0.0
         if index == 0:
             if abs(start) > 0.001:
-                raise SubtitleBuildError("The first EDL picture event must start at zero.")
+                raise SubtitleBuildError(
+                    "The first EDL picture event must start at zero."
+                )
         else:
             boundary = boundaries[index - 1]
             if not isinstance(boundary, dict):
@@ -527,4 +579,3 @@ def _picture_events(edl: dict[str, Any]) -> dict[str, dict[str, Any]]:
         previous_out = end
         previous_segment_id = segment_id
     return result
-
