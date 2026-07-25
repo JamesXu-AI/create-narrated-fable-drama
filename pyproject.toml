@@ -9,6 +9,7 @@ description = "Repository-local production workflow for 16:9 narrated fable dram
 requires-python = ">=3.11"
 dependencies = [
   "faster-whisper>=1.2,<2",
+  "numpy>=2,<3",
 ]
 
 [project.scripts]

@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Any
+
+from finishing.plan import materialize_kept_ranges
 
 from narrated_fable_drama.contracts.boundary import classify_boundary
 from narrated_fable_drama.contracts.screenplay import load_screenplay_file
@@ -24,7 +26,6 @@ from narrated_fable_drama.media.probe import (
     probe_json,
     stream_by_type,
 )
-from finishing.plan import materialize_kept_ranges
 
 SEGMENT_RE = re.compile(r"^segment-([0-9]{3})$")
 MAX_FINAL_RUNTIME_SECONDS = 240.0
@@ -109,6 +110,13 @@ def _validate_project_audio(task_dir: Path) -> dict[str, Any]:
     return context
 
 
+def _authored_audio_handoff(boundary: dict[str, Any]) -> str:
+    value = boundary.get("audio_handoff_en")
+    if not isinstance(value, str) or not value.strip():
+        raise TimelineError("Authored boundary is missing audio_handoff_en")
+    return value.strip()
+
+
 def discover_segments(
     task_dir: Path,
     *,
@@ -148,7 +156,9 @@ def discover_segments(
     if not media_root.is_dir() or not scripts_root.is_dir():
         raise TimelineError("Missing current .pending Segment media or Segment Scripts")
     actual_media = sorted(
-        item.name for item in media_root.iterdir() if item.is_dir() and SEGMENT_RE.fullmatch(item.name)
+        item.name
+        for item in media_root.iterdir()
+        if item.is_dir() and SEGMENT_RE.fullmatch(item.name)
     )
     actual_scripts = sorted(path.stem for path in scripts_root.glob("segment-*.md"))
     if validation_through_segment_id is not None:
@@ -177,8 +187,22 @@ def discover_segments(
             or production_record.get("status") != "GENERATED"
         ):
             raise TimelineError(f"{segment_name} is not a completed generated Segment")
+        voice_gate = production_record.get("voice_identity_gate")
+        if voice_gate is not None and (
+            not isinstance(voice_gate, dict)
+            or voice_gate.get("status") not in {"PASS", "NOT_APPLICABLE"}
+            or voice_gate.get("blocks_acceptance") is not False
+        ):
+            raise TimelineError(
+                f"{segment_name} has not passed its approved-reference "
+                "voice-identity gate"
+            )
         attempt_number = production_record.get("attempt_number")
-        if isinstance(attempt_number, bool) or not isinstance(attempt_number, int) or attempt_number < 1:
+        if (
+            isinstance(attempt_number, bool)
+            or not isinstance(attempt_number, int)
+            or attempt_number < 1
+        ):
             raise TimelineError(f"{segment_name} has invalid provider attempt identity")
         provider_attempt_id = f"{segment_name}__attempt-{attempt_number:04d}"
         recorded_attempt = production_record.get("provider_attempt_id")
@@ -201,7 +225,8 @@ def discover_segments(
         probe = probe_media(video)
         if not probe.has_audio:
             raise TimelineError(
-                f"{segment_name} lacks required Seedance native dialogue/foley/ambience audio"
+                f"{segment_name} lacks required Seedance native "
+                "dialogue/foley/ambience audio"
             )
         if probe.duration_seconds <= 0 or probe.duration_seconds > 15.25:
             raise TimelineError(f"{segment_name} has invalid generated duration")
@@ -319,7 +344,9 @@ def compile_timelines(
                 "timeline_in_seconds": round(audio_start, 6),
                 "timeline_out_seconds": round(audio_start + audio_duration, 6),
                 "duration_seconds": round(audio_duration, 6),
-                "purpose": "seedance_native_dialogue_foley_ambience_and_background_music",
+                "purpose": (
+                    "seedance_native_dialogue_foley_ambience_and_background_music"
+                ),
                 "has_source_audio": True,
                 "voice_audio_source": "speaker_reference_audio",
                 "dialogue_source": "seedance",
@@ -344,7 +371,9 @@ def compile_timelines(
                 or boundary_plan.get("from") != record.segment_name
                 or boundary_plan.get("to") != records[index + 1].segment_name
             ):
-                raise TimelineError("Boundary order differs between authored and model plans")
+                raise TimelineError(
+                    "Boundary order differs between authored and model plans"
+                )
             overlap = float(boundary_plan["picture"]["overlap_seconds"])
             picture_operation = str(boundary_plan["picture"]["operation"])
             transition_class = classify_boundary(
@@ -358,7 +387,7 @@ def compile_timelines(
                     "to": records[index + 1].segment_name,
                     "boundary_id": boundary_plan["boundary_id"],
                     "authored_transition_type": authored["transition_type"],
-                    "authored_audio_handoff": authored["audio_handoff"],
+                    "authored_audio_handoff": _authored_audio_handoff(authored),
                     "transition_class": transition_class,
                     "timeline_seconds": round(end - overlap, 6),
                     "transition_start_seconds": round(end - overlap, 6),
@@ -423,7 +452,8 @@ def compile_timelines(
     )
     if last_audio_end + 1e-6 < cursor:
         raise TimelineError(
-            "Explicit audio events end before picture; automatic silence padding is forbidden"
+            "Explicit audio events end before picture; automatic silence "
+            "padding is forbidden"
         )
 
     picture_edl = {

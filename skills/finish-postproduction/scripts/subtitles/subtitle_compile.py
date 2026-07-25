@@ -67,17 +67,24 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
     if storyboard_ids != list(events):
         raise SubtitleBuildError("Storyboard coverage/order differs from picture EDL.")
     language = _target_language(project_context)
-    source_cue_specs = [
-        {
-            "cue_id": str(cue.get("cue_id") or ""),
-            "exact_text": str(cue.get("exact_text") or "").strip(),
-        }
-        for storyboard in storyboards.values()
-        for block in storyboard.get("timeline_blocks", [])
-        if isinstance(block, dict)
-        for cue in block.get("dialogue_cues", [])
-        if isinstance(cue, dict)
-    ]
+    source_cue_specs = []
+    for segment_id, storyboard in storyboards.items():
+        event = events[segment_id]
+        for block in storyboard.get("timeline_blocks", []):
+            if not isinstance(block, dict):
+                continue
+            for cue in block.get("dialogue_cues", []):
+                if not isinstance(cue, dict):
+                    continue
+                source_cue_specs.append(
+                    {
+                        "cue_id": str(cue.get("cue_id") or ""),
+                        "exact_text": str(cue.get("exact_text") or "").strip(),
+                        "segment_id": segment_id,
+                        "window_start_seconds": event["start"],
+                        "window_end_seconds": event["end"],
+                    }
+                )
     if any(
         not item["cue_id"] or not item["exact_text"] for item in source_cue_specs
     ):

@@ -5,9 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from preflight_segment import preflight_segment
+
 from narrated_fable_drama.contracts.segment import sha256_json
 from narrated_fable_drama.providers import runtime as provider_runtime
 from narrated_fable_drama.providers import seedance
+
 from .common import (
     ACTIVE_ATTEMPT_DIRNAME,
     DEPARTMENT_DIRNAME,
@@ -27,7 +30,6 @@ from .provider_tasks import (
 )
 from .requests import request_payload
 from .reset import _probe_media
-from preflight_segment import preflight_segment
 
 
 def _archive_failed_attempt(
@@ -103,9 +105,14 @@ def _completed_result(
     video_path = directory / "video.mp4"
     record_path = directory / "production-record.json"
     last_frame_path = directory / "last-frame.png"
-    if not video_path.is_file() or not last_frame_path.is_file() or not record_path.is_file():
+    if (
+        not video_path.is_file()
+        or not last_frame_path.is_file()
+        or not record_path.is_file()
+    ):
         raise SegmentGenerationError(
-            f"{segment['generation_task_id']} succeeded attempt lacks video, final frame, or record."
+            f"{segment['generation_task_id']} succeeded attempt lacks video, "
+            "final frame, or record."
         )
     record = read_json(record_path)
     attempt_number = submission.get("attempt_number")
@@ -155,7 +162,11 @@ def generate_one(
 ) -> dict[str, Any]:
     segment_id = segment["generation_task_id"]
     published_dir = (
-        task_dir / PENDING_DIRNAME / DEPARTMENT_DIRNAME / GENERATION_DIRNAME / segment_id
+        task_dir
+        / PENDING_DIRNAME
+        / DEPARTMENT_DIRNAME
+        / GENERATION_DIRNAME
+        / segment_id
     )
     preflight_segment(
         task_dir=task_dir,
@@ -174,10 +185,14 @@ def generate_one(
     if published_dir.is_dir():
         submission = _load_resumable_attempt(segment, published_dir, request)
         if submission is None:
-            raise SegmentGenerationError(f"{segment_id} published directory is incomplete.")
+            raise SegmentGenerationError(
+                f"{segment_id} published directory is incomplete."
+            )
         completed = _completed_result(segment, published_dir, submission)
         if completed is None:
-            raise SegmentGenerationError(f"{segment_id} published directory is not successful.")
+            raise SegmentGenerationError(
+                f"{segment_id} published directory is not successful."
+            )
         announce(f"SKIP {segment_id} generated video already exists")
         return completed
 
@@ -212,7 +227,9 @@ def generate_one(
                     "fresh human confirmation."
                 ) from exc
             if completed is None:
-                raise SegmentGenerationError(f"{segment_id} succeeded attempt is incomplete.")
+                raise SegmentGenerationError(
+                    f"{segment_id} succeeded attempt is incomplete."
+                )
             published_dir.parent.mkdir(parents=True, exist_ok=True)
             active_dir.replace(published_dir)
             completed["video_path"] = str((published_dir / "video.mp4").resolve())
@@ -299,7 +316,9 @@ def generate_one(
             content.get("last_frame_url") if isinstance(content, dict) else None
         )
         if not isinstance(video_url, str) or not video_url:
-            raise SegmentGenerationError(f"{segment_id} provider returned no video URL.")
+            raise SegmentGenerationError(
+                f"{segment_id} provider returned no video URL."
+            )
         if not isinstance(last_frame_url, str) or not last_frame_url:
             raise SegmentGenerationError(
                 f"{segment_id} provider returned no final frame despite "
@@ -352,12 +371,21 @@ def generate_one(
             "video_source_url": provider_runtime.persistent_tos_url(video_url),
             "video_bytes": video_path.stat().st_size,
             "last_frame_path": "last-frame.png",
-            "last_frame_source_url": provider_runtime.persistent_tos_url(last_frame_url),
+            "last_frame_source_url": provider_runtime.persistent_tos_url(
+                last_frame_url
+            ),
             "last_frame_bytes": last_frame_path.stat().st_size,
             "media_probe": media_probe,
             "generate_audio": True,
             "seedance_audio_mode": segment["audio_policy"]["seedance_audio_mode"],
             "dialogue_source": segment["audio_policy"]["dialogue_source"],
+            "voice_identity_gate": {
+                "contract": "video-review-voice-identity-gate/v1",
+                "segment_id": segment_id,
+                "status": "PENDING",
+                "blocks_acceptance": True,
+                "human_listening_review_required": True,
+            },
             "status": "GENERATED",
         },
     )

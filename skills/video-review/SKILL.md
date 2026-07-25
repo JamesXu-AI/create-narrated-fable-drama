@@ -36,6 +36,11 @@ For scripts and Storyboards, check:
 For generated video, watch the full clip at normal speed with sound. Check:
 
 - the correct visible or off-camera speaker says every exact line once;
+- before returning `NO_ISSUES`, compare every speaking character with that
+  character's approved voice reference and with the same character's nearest
+  generated speech; check timbre, register, age, texture, accent, pace, energy,
+  and forbidden effects such as squeak, helium pitch, buzzing distortion, or
+  generic narrator replacement;
 - only the intended speaker's mouth moves and lip sync is natural;
 - an on-screen character remains the same recognizable voice when becoming an
   off-screen storyteller;
@@ -58,6 +63,11 @@ For generated video, watch the full clip at normal speed with sound. Check:
   mark-transfer, or other consequential position change, then returns tight;
 - no paraphrase, missing/extra words, clipped speech, voice mismatch, text,
   captions, logo, watermark, anatomy defect, or extension replay appears.
+
+Run the repository voice-identity evidence gate for every completed Segment that
+contains speech. A technical `FAIL`, missing voice reference, unreadable audio, or
+unmeasurable speech blocks Segment acceptance and successor generation. A
+technical `PASS` does not replace normal-speed human/model listening review.
 
 For a final film, watch clean and captioned masters end to end. Check story order,
 rhythm, framing/embedded-world readability, all speech transitions, subtitle

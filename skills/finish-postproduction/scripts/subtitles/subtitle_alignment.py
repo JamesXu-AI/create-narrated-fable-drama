@@ -188,16 +188,21 @@ def _match_cue_tokens(
     cursor: int,
     lookahead_tokens: int,
     minimum_token_similarity: float,
+    observed_limit: int | None = None,
 ) -> tuple[list[ObservedToken | None], int]:
     matches: list[ObservedToken | None] = []
     current = cursor
     for expected in expected_tokens:
-        limit = min(len(observed), current + lookahead_tokens)
+        limit = min(
+            len(observed),
+            current + lookahead_tokens,
+            observed_limit if observed_limit is not None else len(observed),
+        )
         best_index: int | None = None
         best_score = minimum_token_similarity
         for candidate_index in range(current, limit):
             similarity = _similarity(expected, observed[candidate_index].text)
-            distance_penalty = (candidate_index - current) * 0.002
+            distance_penalty = (candidate_index - current) * 0.05
             score = similarity - distance_penalty
             if score >= best_score:
                 best_score = score
@@ -313,7 +318,7 @@ def _resolved_token_timings(
 
 
 def align_authoritative_cues(
-    cue_specs: list[dict[str, str]],
+    cue_specs: list[dict[str, Any]],
     words: list[TimedWord],
     *,
     minimum_token_coverage: float,
@@ -336,12 +341,40 @@ def align_authoritative_cues(
         expected = _tokens(cue["exact_text"])
         if not expected:
             raise SubtitleBuildError(f"Subtitle cue has no alignable text: {cue_id}")
+        window_start = cue.get("window_start_seconds")
+        window_end = cue.get("window_end_seconds")
+        observed_limit: int | None = None
+        if window_start is not None or window_end is not None:
+            if (
+                isinstance(window_start, bool)
+                or isinstance(window_end, bool)
+                or not isinstance(window_start, (int, float))
+                or not isinstance(window_end, (int, float))
+                or float(window_end) <= float(window_start)
+            ):
+                raise SubtitleBuildError(
+                    f"Subtitle cue has an invalid final-timeline ownership window: "
+                    f"{cue_id}"
+                )
+            while (
+                cursor < len(observed)
+                and observed[cursor].word.end_seconds < float(window_start) - 0.05
+            ):
+                cursor += 1
+            observed_limit = cursor
+            while (
+                observed_limit < len(observed)
+                and observed[observed_limit].word.start_seconds
+                <= float(window_end) + 0.05
+            ):
+                observed_limit += 1
         matches, cursor = _match_cue_tokens(
             expected,
             observed,
             cursor=cursor,
             lookahead_tokens=lookahead_tokens,
             minimum_token_similarity=minimum_token_similarity,
+            observed_limit=observed_limit,
         )
         matched_count = sum(match is not None for match in matches)
         coverage = matched_count / len(expected)

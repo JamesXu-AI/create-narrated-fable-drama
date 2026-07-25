@@ -17,7 +17,9 @@ from .qc_evidence import (
     _render_strict_sample,
 )
 from .qc_metrics import (
+    _extract_yuv_frames,
     _normalized_luma_correlation,
+    _plane_stats,
     measure_boundary,
 )
 from .qc_policy import (

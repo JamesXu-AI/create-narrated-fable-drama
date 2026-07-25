@@ -7,6 +7,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 
 SCRIPTS = (
@@ -23,6 +24,9 @@ from finishing.plan import (  # noqa: E402
     load_repair_plan,
 )
 from assemble_segment_videos import _render_filter  # noqa: E402
+from boundary.qc import _measure_master_sample  # noqa: E402
+from boundary.qc_evidence import _extract_frame_evidence  # noqa: E402
+from post_timeline import TimelineError, _authored_audio_handoff  # noqa: E402
 from subtitles.subtitle_compile import _source_time_to_retained_time  # noqa: E402
 
 
@@ -182,6 +186,93 @@ def _load(
 
 
 class RepairPlanTests(unittest.TestCase):
+    def test_final_boundary_audit_uses_shared_frame_metrics(self) -> None:
+        frames = [
+            (
+                bytes([32 + index]) * 4,
+                bytes([120 + index % 3]) * 4,
+                bytes([132 + index % 5]) * 4,
+            )
+            for index in range(48)
+        ]
+        config = {
+            "analysis": {
+                "width": 2,
+                "anchor_frame_count": 2,
+            },
+            "strict_sample": {
+                "frame_rate": 24,
+                "frame_count": 48,
+            },
+        }
+        with (
+            patch("boundary.qc._probe_dimensions", return_value=(2, 2)),
+            patch("boundary.qc._extract_yuv_frames", return_value=frames),
+        ):
+            metrics = _measure_master_sample(
+                Path("picture-lock-seam.mp4"),
+                config,
+            )
+        self.assertEqual(
+            metrics["analysis_role"],
+            "post_assembly_technical_detection_evidence_only",
+        )
+        self.assertEqual(metrics["analysis_frame_count_per_side"], 2)
+
+    def test_boundary_frame_evidence_writes_manifest_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            sample = tmp_path / "strict-sample.mp4"
+            sample.write_bytes(b"sample")
+            output_dir = tmp_path / "evidence"
+            config = {
+                "strict_sample": {
+                    "frame_rate": 24,
+                    "frame_count": 48,
+                    "evidence_frame_width": 960,
+                }
+            }
+
+            def fake_run(command: list[str], *, label: str) -> None:
+                output = Path(command[-1])
+                output.parent.mkdir(parents=True, exist_ok=True)
+                if "%06d" in output.name:
+                    for index in range(1, 49):
+                        Path(str(output).replace("%06d", f"{index:06d}")).write_bytes(
+                            b"frame"
+                        )
+                else:
+                    output.write_bytes(b"contact-sheet")
+
+            with patch(
+                "boundary.qc_evidence._run",
+                side_effect=fake_run,
+            ):
+                result = _extract_frame_evidence(
+                    sample,
+                    output_dir,
+                    config,
+                )
+            manifest = json.loads(
+                Path(result["frame_manifest"]).read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["frame_count"], 48)
+            self.assertEqual(len(manifest["frames"]), 48)
+
+    def test_timeline_reads_current_authored_audio_handoff_field(self) -> None:
+        self.assertEqual(
+            _authored_audio_handoff(
+                {
+                    "audio_handoff_en": (
+                        "The buzz enters as a J cut before the Lion reacts."
+                    )
+                }
+            ),
+            "The buzz enters as a J cut before the Lion reacts.",
+        )
+        with self.assertRaisesRegex(TimelineError, "audio_handoff_en"):
+            _authored_audio_handoff({"audio_handoff": "stale field"})
+
     def test_valid_explicit_plan_loads_without_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             tmp_path = Path(temporary)

@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 import fcntl
 import json
-from pathlib import Path
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
+from preflight_segment import (
+    parse_predecessor_observations,
+    predecessor_observation_requirement,
+)
+
 from narrated_fable_drama.contracts.segment import storyboard_segment_rows
+
 from .attempts import generate_one
 from .boundary_precheck import prepare_adjacent_boundary_prechecks
 from .common import (
@@ -27,15 +33,19 @@ from .requests import (
     _task_contract,
     discover_segments,
 )
-from preflight_segment import (
-    parse_predecessor_observations,
-    predecessor_observation_requirement,
+from .voice_precheck import (
+    prepare_voice_identity_precheck,
+    recorded_voice_gate_allows_downstream,
 )
 
 
 def _published_segment_ready(task_dir: Path, segment_id: str) -> bool:
     directory = (
-        task_dir / PENDING_DIRNAME / DEPARTMENT_DIRNAME / GENERATION_DIRNAME / segment_id
+        task_dir
+        / PENDING_DIRNAME
+        / DEPARTMENT_DIRNAME
+        / GENERATION_DIRNAME
+        / segment_id
     )
     record_path = directory / "production-record.json"
     if not record_path.is_file():
@@ -121,7 +131,9 @@ def _storyboard_topological_waves(
         or segment["planned_wave"] < 0
         for segment in segments
     ):
-        raise SegmentGenerationError("Every Segment requires one non-negative planned_wave")
+        raise SegmentGenerationError(
+            "Every Segment requires one non-negative planned_wave"
+        )
     waves: list[list[str]] = []
     for planned_wave in sorted({segment["planned_wave"] for segment in segments}):
         ready = [
@@ -172,6 +184,26 @@ def run(args: argparse.Namespace) -> int:
     selected_order = [
         segment["generation_task_id"] for segment in segments
     ]
+    blocked_voice_predecessors: list[str] = []
+    for segment_id in selected_order:
+        segment_index = all_segment_ids.index(segment_id)
+        if segment_index == 0:
+            continue
+        predecessor_id = all_segment_ids[segment_index - 1]
+        if (
+            _published_segment_ready(task_dir, predecessor_id)
+            and not recorded_voice_gate_allows_downstream(
+                task_dir,
+                predecessor_id,
+            )
+        ):
+            blocked_voice_predecessors.append(predecessor_id)
+    if blocked_voice_predecessors:
+        raise SegmentGenerationError(
+            "Successor generation is blocked by failed predecessor voice-identity "
+            "gates: "
+            + ", ".join(sorted(set(blocked_voice_predecessors)))
+        )
     selected_ids = set(selected_order)
     _enforce_human_confirmation(
         task_dir=task_dir,
@@ -200,11 +232,11 @@ def run(args: argparse.Namespace) -> int:
             "Predecessor observations are valid only for serial reviewed Segments: "
             + ", ".join(unnecessary_observations)
         )
-    pending_root = task_dir / PENDING_DIRNAME / DEPARTMENT_DIRNAME
     waves = _storyboard_topological_waves(segments, task_dir=task_dir)
     announce(
         f"START segments={len(segments)} resolution={task['resolution']} "
-        f"ratio={task['ratio']} audio_mode={task.get('seedance_audio_mode', 'native_sync')} "
+        f"ratio={task['ratio']} "
+        f"audio_mode={task.get('seedance_audio_mode', 'native_sync')} "
         "scheduler=storyboard_shooting_plan_waves"
     )
     results: list[dict[str, Any]] = []
@@ -212,6 +244,9 @@ def run(args: argparse.Namespace) -> int:
     boundary_precheck_failures: list[dict[str, str]] = []
     boundary_prechecks: dict[str, dict[str, Any]] = {}
     boundary_review_holds: dict[str, dict[str, Any]] = {}
+    voice_precheck_failures: list[dict[str, str]] = []
+    voice_identity_gates: dict[str, dict[str, Any]] = {}
+    voice_identity_holds: dict[str, dict[str, Any]] = {}
     predecessor_observation_holds: dict[str, dict[str, Any]] = {}
     segment_by_id = {
         segment["generation_task_id"]: segment for segment in segments
@@ -272,6 +307,36 @@ def run(args: argparse.Namespace) -> int:
                     continue
                 results.append(result)
                 try:
+                    voice_gate = prepare_voice_identity_precheck(
+                        task_dir,
+                        segment_id,
+                    )
+                    voice_identity_gates[segment_id] = voice_gate
+                    announce(
+                        "VOICE_IDENTITY_GATE "
+                        f"segment={segment_id} status={voice_gate['status']} "
+                        f"human_listening_review_required="
+                        f"{voice_gate['human_listening_review_required']}"
+                    )
+                    if voice_gate["blocks_acceptance"] is True:
+                        voice_identity_holds[segment_id] = {
+                            "segment_id": segment_id,
+                            "status": str(voice_gate["status"]),
+                            "failed_cue_ids": list(
+                                voice_gate.get("failed_cue_ids") or []
+                            ),
+                            "reason": (
+                                "Generated voice differs materially from the "
+                                "approved character reference."
+                            ),
+                            "recommended_owner": "virtual-production",
+                        }
+                except Exception as exc:
+                    voice_precheck_failures.append(
+                        {"segment_id": segment_id, "error": str(exc)}
+                    )
+                    announce(f"VOICE_IDENTITY_GATE_FAIL {segment_id} error={exc}")
+                try:
                     checks = prepare_adjacent_boundary_prechecks(
                         task_dir,
                         segment_id,
@@ -292,7 +357,8 @@ def run(args: argparse.Namespace) -> int:
                                 "technical_status": str(check["technical_status"]),
                                 "reason": str(check.get("technical_reason") or ""),
                                 "recommended_owner": str(
-                                    check.get("recommended_owner") or "virtual-production"
+                                    check.get("recommended_owner")
+                                    or "virtual-production"
                                 ),
                             }
                 except Exception as exc:
@@ -300,9 +366,20 @@ def run(args: argparse.Namespace) -> int:
                         {"segment_id": segment_id, "error": str(exc)}
                     )
                     announce(f"BOUNDARY_PRECHECK_FAIL {segment_id} error={exc}")
-        if failures or boundary_precheck_failures or boundary_review_holds:
-            if failures or boundary_precheck_failures:
+        if (
+            failures
+            or voice_precheck_failures
+            or voice_identity_holds
+            or boundary_precheck_failures
+            or boundary_review_holds
+        ):
+            if failures or voice_precheck_failures or boundary_precheck_failures:
                 announce("STOP downstream waves because an upstream wave failed")
+            elif voice_identity_holds:
+                announce(
+                    "STOP downstream waves because a generated character voice "
+                    "failed its approved-reference identity gate"
+                )
             else:
                 announce(
                     "STOP downstream waves because an incremental boundary needs "
@@ -311,10 +388,13 @@ def run(args: argparse.Namespace) -> int:
             break
     results.sort(key=lambda item: item["segment_id"])
     failures.sort(key=lambda item: item["segment_id"])
+    voice_precheck_failures.sort(key=lambda item: item["segment_id"])
     boundary_precheck_failures.sort(key=lambda item: item["segment_id"])
     summary_status = (
         "failed"
-        if failures or boundary_precheck_failures
+        if failures or voice_precheck_failures or boundary_precheck_failures
+        else "voice_identity_failed"
+        if voice_identity_holds
         else "boundary_review_required"
         if boundary_review_holds
         else "predecessor_observation_required"
@@ -332,6 +412,25 @@ def run(args: argparse.Namespace) -> int:
         "dialogue_source": task.get("dialogue_source", "seedance"),
         "results": results,
         "failures": failures,
+        "voice_identity_gate_count": len(voice_identity_gates),
+        "voice_identity_gates": [
+            {
+                "segment_id": segment_id,
+                "status": gate["status"],
+                "blocks_acceptance": gate["blocks_acceptance"],
+                "human_listening_review_required": gate[
+                    "human_listening_review_required"
+                ],
+                "failed_cue_ids": gate.get("failed_cue_ids", []),
+            }
+            for segment_id, gate in sorted(voice_identity_gates.items())
+        ],
+        "voice_precheck_failed_count": len(voice_precheck_failures),
+        "voice_precheck_failures": voice_precheck_failures,
+        "voice_identity_hold_count": len(voice_identity_holds),
+        "voice_identity_holds": [
+            voice_identity_holds[key] for key in sorted(voice_identity_holds)
+        ],
         "boundary_precheck_failed_count": len(boundary_precheck_failures),
         "boundary_precheck_failures": boundary_precheck_failures,
         "incremental_boundary_precheck_count": len(boundary_prechecks),
@@ -359,12 +458,15 @@ def run(args: argparse.Namespace) -> int:
     }
     if (
         not failures
+        and not voice_precheck_failures
+        and not voice_identity_holds
         and not boundary_precheck_failures
         and not boundary_review_holds
         and not predecessor_observation_holds
     ):
         full_generation = all(
             _published_segment_ready(task_dir, segment_id)
+            and recorded_voice_gate_allows_downstream(task_dir, segment_id)
             for segment_id in all_segment_ids
         )
         summary["state"] = "GENERATED" if full_generation else "CANARY_GENERATED"
@@ -372,6 +474,8 @@ def run(args: argparse.Namespace) -> int:
     return (
         0
         if not failures
+        and not voice_precheck_failures
+        and not voice_identity_holds
         and not boundary_precheck_failures
         and not boundary_review_holds
         and not predecessor_observation_holds
@@ -431,7 +535,8 @@ def task_execution_lock(task_dir: Path):
             acquired = True
         except BlockingIOError as exc:
             raise SegmentGenerationError(
-                f"Another Seedance generation process already owns this task: {task_dir}"
+                "Another Seedance generation process already owns this task: "
+                f"{task_dir}"
             ) from exc
         yield
     finally:

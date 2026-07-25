@@ -95,8 +95,12 @@ python3 skills/virtual-production/scripts/generate_segment_videos.py \
 ```
 
 Generate one Segment per approval. After generation, review the complete clip with
-sound and its incoming seam. A failed clip gets a new provider attempt; never
-rewrite the approved story silently during generation.
+sound and its incoming seam. Before the Segment can be accepted or used by a
+successor, run the approved-reference voice-identity gate for every dialogue cue,
+then explicitly listen for the same timbre, register, age, texture, accent, pace,
+and energy. Missing evidence or any voice-identity failure blocks downstream work.
+A failed clip gets a new provider attempt; never rewrite the approved story
+silently during generation.
 
 ## Stop conditions
 

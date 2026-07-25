@@ -1,0 +1,15 @@
+{
+  "contract": "video-review-voice-identity-gate-config/v1",
+  "sample_rate_hz": 16000,
+  "frame_duration_seconds": 0.025,
+  "frame_hop_seconds": 0.01,
+  "vad_energy_quantile": 0.55,
+  "minimum_pitch_autocorrelation": 0.25,
+  "minimum_voiced_frame_count": 8,
+  "minimum_candidate_duration_seconds": 0.5,
+  "minimum_pitch_hz": 80.0,
+  "maximum_pitch_hz": 500.0,
+  "maximum_median_pitch_ratio": 2.75,
+  "maximum_spectral_centroid_ratio": 1.75,
+  "minimum_spectral_envelope_similarity": 0.85
+}

@@ -123,6 +123,12 @@ audiovisual review, then report:
 请确认下一步：
 ```
 
+For every Segment containing speech, the post-attempt review must first compare
+each generated speaker against the approved character voice reference. Report and
+block on timbre/register/age/texture/accent drift, forbidden squeak or helium
+effects, missing reference media, unreadable speech evidence, or a failed
+voice-identity gate. Technical PASS never replaces listening at normal speed.
+
 Pause even when review returns `NO_ISSUES`. Do not generate the successor, retry,
 or enter final assembly until the human chooses the next action.
 

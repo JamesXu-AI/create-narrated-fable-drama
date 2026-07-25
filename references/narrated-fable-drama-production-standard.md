@@ -209,4 +209,8 @@ Release a phase only when:
    position change;
 8. adjacent Segments preserve character, prop, environment, voice, and ambience
    state without replay or unexplained reset; and
-9. generated video has been reviewed with sound before acceptance.
+9. every generated Segment with speech has passed approved-reference acoustic
+   voice-identity evidence and normal-speed listening review for timbre, register,
+   age, texture, accent, pace, energy, and forbidden voice effects before
+   acceptance; and
+10. generated video has been reviewed with sound before acceptance.

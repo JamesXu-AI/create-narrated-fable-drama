@@ -56,6 +56,89 @@ def _align(
 
 
 class SubtitleAlignmentTests(unittest.TestCase):
+    def test_alignment_cannot_steal_an_exact_word_from_the_next_segment(
+        self,
+    ) -> None:
+        alignments = align_authoritative_cues(
+            [
+                {
+                    "cue_id": "L-004",
+                    "exact_text": "I am your master.",
+                    "window_start_seconds": 0.0,
+                    "window_end_seconds": 5.0,
+                },
+                {
+                    "cue_id": "L-005",
+                    "exact_text": "Your strength is a trust.",
+                    "window_start_seconds": 10.0,
+                    "window_end_seconds": 15.0,
+                },
+            ],
+            [
+                _word("I", 1.0, 1.1),
+                _word("am", 1.1, 1.3),
+                _word("our", 1.3, 1.6),
+                _word("master", 1.6, 2.0),
+                _word("Your", 10.5, 10.8),
+                _word("strength", 10.8, 11.2),
+                _word("is", 11.2, 11.4),
+                _word("a", 11.4, 11.5),
+                _word("trust", 11.5, 11.9),
+            ],
+            minimum_token_coverage=0.75,
+            minimum_token_similarity=0.72,
+            lookahead_tokens=24,
+            outlier_gap_seconds=1.25,
+            outlier_probability_threshold=0.65,
+        )
+        self.assertEqual(
+            alignments["L-004"]["tokens"][2]["observed_text"],
+            "our",
+        )
+        self.assertLess(alignments["L-004"]["speech_end_seconds"], 5.0)
+        self.assertGreater(alignments["L-005"]["speech_start_seconds"], 10.0)
+
+    def test_alignment_does_not_steal_a_repeated_word_later_in_the_cue(
+        self,
+    ) -> None:
+        alignment = align_authoritative_cues(
+            [
+                {
+                    "cue_id": "L-017",
+                    "exact_text": (
+                        "The lion thought strength made him greater, but the "
+                        "smallest creature exposed his weakness."
+                    ),
+                    "window_start_seconds": 149.0,
+                    "window_end_seconds": 161.1,
+                }
+            ],
+            [
+                _word("lion", 154.7, 155.1),
+                _word("thought", 155.1, 155.5),
+                _word("strength", 155.5, 156.0),
+                _word("made", 156.0, 156.4),
+                _word("him", 156.4, 156.7),
+                _word("greater", 156.7, 157.0),
+                _word("but", 157.7, 157.9),
+                _word("the", 157.9, 158.1),
+                _word("smallest", 158.1, 158.6),
+                _word("creature", 158.6, 159.1),
+                _word("exposed", 159.1, 159.9),
+                _word("his", 159.9, 160.2),
+                _word("weakness", 160.2, 160.6),
+            ],
+            minimum_token_coverage=0.75,
+            minimum_token_similarity=0.72,
+            lookahead_tokens=24,
+            outlier_gap_seconds=1.25,
+            outlier_probability_threshold=0.65,
+        )["L-017"]
+        self.assertIsNone(alignment["tokens"][0]["observed_text"])
+        self.assertEqual(alignment["tokens"][1]["observed_text"], "lion")
+        self.assertEqual(alignment["tokens"][8]["observed_text"], "the")
+        self.assertEqual(alignment["matched_token_count"], 13)
+
     def test_alignment_source_hash_is_content_stable(self) -> None:
         self.assertEqual(
             sha256_file(DEFAULT_STYLE),

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from narrated_fable_drama.core.json_io import write_json_atomic
+
 from .qc_policy import BoundaryQCError, _run
 
 
@@ -177,7 +179,7 @@ def _extract_frame_evidence(
         ],
     }
     manifest_path = directory / "frame-manifest.json"
-    _write_json(manifest_path, manifest)
+    write_json_atomic(manifest_path, manifest, sort_keys=True)
     contact_sheet = directory / "contact-sheet-48.jpg"
     _run(
         [
