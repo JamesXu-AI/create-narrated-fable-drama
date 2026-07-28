@@ -9,6 +9,11 @@ from typing import Any
 
 from narrated_fable_drama.core.json_io import load_json_object
 from narrated_fable_drama.core.paths import ProjectPaths
+from narrated_fable_drama.core.project_domain import (
+    TARGET_LANGUAGE,
+    ProjectDomainError,
+    validate_arabic_dialogue,
+)
 
 SKILL_ROOT = (
     ProjectPaths.resolve(Path(__file__)).repository_root
@@ -35,13 +40,14 @@ STYLE_KEYS = {
     "subtitle_lead_in_seconds",
     "subtitle_trail_out_seconds",
     "max_lines",
-    "max_characters_per_line_cjk",
-    "max_characters_per_line_latin",
+    "max_characters_per_line_arabic",
     "minimum_cue_duration_seconds",
-    "maximum_characters_per_second_cjk",
-    "maximum_words_per_minute_latin",
+    "maximum_words_per_minute_arabic",
     "position",
     "bottom_margin_percent",
+    "renderer",
+    "font_asset",
+    "font_sha256",
     "font_family",
     "font_size_percent_of_frame_height",
     "font_weight",
@@ -95,13 +101,34 @@ def _validate_style(style: dict[str, Any]) -> None:
         != "final_clean_master_word_alignment"
     ):
         raise SubtitleBuildError("Subtitle timing authority is invalid.")
+    if style["renderer"] != "pillow_raqm":
+        raise SubtitleBuildError(
+            "Arabic hard subtitles must use the pillow_raqm renderer."
+        )
     for field in (
         "alignment_model_family",
         "alignment_device",
         "alignment_compute_type",
+        "font_asset",
+        "font_sha256",
+        "font_family",
+        "font_weight",
     ):
         if not isinstance(style[field], str) or not style[field].strip():
             raise SubtitleBuildError(f"subtitle style {field} must be non-empty.")
+    font_asset = Path(style["font_asset"])
+    if (
+        font_asset.is_absolute()
+        or ".." in font_asset.parts
+        or font_asset.suffix.casefold() not in {".ttf", ".otf"}
+    ):
+        raise SubtitleBuildError(
+            "subtitle style font_asset must be a safe relative TTF/OTF path."
+        )
+    if re.fullmatch(r"[0-9a-f]{64}", style["font_sha256"]) is None:
+        raise SubtitleBuildError(
+            "subtitle style font_sha256 must be a lowercase SHA-256 digest."
+        )
     for field in ("alignment_beam_size", "alignment_token_lookahead"):
         if (
             isinstance(style[field], bool)
@@ -111,6 +138,20 @@ def _validate_style(style: dict[str, Any]) -> None:
             raise SubtitleBuildError(
                 f"subtitle style {field} must be a positive integer."
             )
+    if (
+        isinstance(style["max_characters_per_line_arabic"], bool)
+        or not isinstance(style["max_characters_per_line_arabic"], int)
+        or style["max_characters_per_line_arabic"] < 1
+    ):
+        raise SubtitleBuildError(
+            "subtitle style max_characters_per_line_arabic must be a "
+            "positive integer."
+        )
+    _number(
+        style["maximum_words_per_minute_arabic"],
+        "maximum_words_per_minute_arabic",
+        minimum=1,
+    )
     for field in (
         "minimum_alignment_token_coverage",
         "minimum_alignment_token_similarity",
@@ -153,9 +194,19 @@ def _segment_name(value: Any) -> str:
 
 def _target_language(project_context: dict[str, Any]) -> str:
     value = project_context.get("target_language")
-    if not isinstance(value, str) or not value.strip():
-        raise SubtitleBuildError("screenplay.md Target Language is invalid.")
-    return value.strip()
+    if value != TARGET_LANGUAGE:
+        raise SubtitleBuildError(
+            f"Subtitle delivery is Arabic-only; screenplay.md Target Language "
+            f"must be {TARGET_LANGUAGE}."
+        )
+    return TARGET_LANGUAGE
+
+
+def _require_arabic_text(text: Any, *, context: str) -> str:
+    try:
+        return validate_arabic_dialogue(text, context=context)
+    except ProjectDomainError as exc:
+        raise SubtitleBuildError(str(exc)) from exc
 
 
 def _is_cjk(text: str) -> bool:
@@ -440,29 +491,22 @@ def _required_display_duration(
 ) -> float:
     """Return the shortest proportional caption interval that passes every limit."""
 
-    weights = [
-        len("".join(chunk_text.split())) if is_cjk else len(chunk_text.split())
-        for chunk_text, _ in chunks
-    ]
+    _require_arabic_text(text, context="subtitle readability gate")
+    if is_cjk:
+        raise SubtitleBuildError("Arabic subtitle text cannot use the CJK gate.")
+    weights = [len(chunk_text.split()) for chunk_text, _ in chunks]
     total_weight = sum(weights)
     if not weights or any(weight <= 0 for weight in weights) or total_weight <= 0:
         raise SubtitleBuildError("Caption duration calculation produced an empty cue.")
     minimum_for_each_chunk = max(
         minimum_duration * total_weight / weight for weight in weights
     )
-    if is_cjk:
-        units_per_second = _number(
-            style["maximum_characters_per_second_cjk"],
-            "maximum_characters_per_second_cjk",
-            minimum=0.1,
-        )
-    else:
-        words_per_minute = _number(
-            style["maximum_words_per_minute_latin"],
-            "maximum_words_per_minute_latin",
-            minimum=1,
-        )
-        units_per_second = words_per_minute / 60.0
+    words_per_minute = _number(
+        style["maximum_words_per_minute_arabic"],
+        "maximum_words_per_minute_arabic",
+        minimum=1,
+    )
+    units_per_second = words_per_minute / 60.0
     minimum_for_readability = total_weight / units_per_second
     return max(
         minimum_duration,
@@ -474,24 +518,18 @@ def _required_display_duration(
 def _readability(text: str, duration: float, style: dict[str, Any]) -> dict[str, Any]:
     if duration <= 0:
         raise SubtitleBuildError("Subtitle duration must be positive.")
-    if _is_cjk(text):
-        count = len("".join(text.split()))
-        rate = count / duration
-        limit = _number(
-            style["maximum_characters_per_second_cjk"],
-            "maximum_characters_per_second_cjk",
-            minimum=0.1,
-        )
-        mode = "characters_per_second"
-    else:
-        count = len(text.split())
-        rate = count / duration * 60.0
-        limit = _number(
-            style["maximum_words_per_minute_latin"],
-            "maximum_words_per_minute_latin",
-            minimum=1,
-        )
-        mode = "words_per_minute"
+    normalized = _require_arabic_text(
+        text,
+        context="subtitle readability gate",
+    )
+    count = len(normalized.split())
+    rate = count / duration * 60.0
+    limit = _number(
+        style["maximum_words_per_minute_arabic"],
+        "maximum_words_per_minute_arabic",
+        minimum=1,
+    )
+    mode = "arabic_words_per_minute"
     if rate > limit + 1e-6:
         raise SubtitleBuildError(
             f"Exact subtitle exceeds reading-speed limit: {rate:.2f} {mode}, "

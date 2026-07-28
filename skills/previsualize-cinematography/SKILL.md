@@ -1,6 +1,6 @@
 ---
 name: previsualize-cinematography
-description: Turn an approved 16:9 AI-narrated fable screenplay into one executable storyboard.md that preserves exact speech, character storytellers, framing and embedded worlds, natural dialogue-to-narration transitions, performance, camera, reference inclusion and omission, native audio, Segment packing, and continuity.
+description: Turn an approved Arabic 16:9 AI-narrated fable screenplay into one executable storyboard.md that preserves exact Arabic speech, disposable Seedance guide performance, Seedance-native ambience/action sound, character storytellers, camera, Segment packing, and continuity.
 ---
 
 # Narrated Fable Drama Previsualization
@@ -88,8 +88,9 @@ cannot deactivate a positive image reference.
 6. Separate framing and embedded Location state chains.
 7. Pack Shots into 4–15 second Generation Segments. Split when visible and absent
    reference requirements conflict or a natural speech boundary improves execution.
-8. Bind every visible performer and needed voice while omitting positive images for
-   visually absent storytellers.
+8. Bind every visible performer image while omitting audio references and positive
+   images for visually absent storytellers; retain the speaker entity ID for later
+   ElevenLabs voice-ID resolution.
 9. Resolve every Segment boundary, audio bridge, ambience handoff, predecessor
    dependency, and return to a prior Location.
 10. Validate:

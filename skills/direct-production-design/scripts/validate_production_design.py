@@ -7,18 +7,18 @@ import argparse
 import json
 from pathlib import Path
 
-from narrated_fable_drama.contracts.asset_catalog import load_asset_catalog
+from aesthetic_reference import load_aesthetic_reference
+from generate_elevenlabs_role_voices import validate_role_voice_map
 from production_design.contract import load_production_design_plan
+from voice_reference_generation import validate_voice_authority
+
+from narrated_fable_drama.contracts.asset_catalog import load_asset_catalog
 from narrated_fable_drama.contracts.role_scope import (
     load_character_performance_map,
 )
 from narrated_fable_drama.contracts.screenplay import load_screenplay_file
 from narrated_fable_drama.core.paths import ProjectPaths
 from narrated_fable_drama.core.project_context import load_project_context
-
-from aesthetic_reference import load_aesthetic_reference
-from voice_reference_generation import validate_voice_authority
-
 
 PROJECT_PATHS = ProjectPaths.resolve(Path(__file__))
 SKILL_ROOT = PROJECT_PATHS.repository_root / "skills/direct-production-design"
@@ -64,7 +64,10 @@ def _validate_silent_group_authority(
             raise ProductionDesignError(
                 f"{asset_id} variation profile differs from the model plan"
             )
-        if member.get("roster_asset", {}).get("subject_count") != ensemble["subject_count"]:
+        if (
+            member.get("roster_asset", {}).get("subject_count")
+            != ensemble["subject_count"]
+        ):
             raise ProductionDesignError(
                 f"{asset_id} subject count differs from the model plan"
             )
@@ -85,7 +88,7 @@ def _validate_silent_group_authority(
 def validate_task(task_dir: Path) -> dict[str, object]:
     task_dir = task_dir.expanduser().resolve(strict=True)
     try:
-        load_project_context(task_dir)
+        project_context = load_project_context(task_dir)
     except Exception as exc:
         raise ProductionDesignError(str(exc)) from exc
     for relative in ("screenplay-writer/screenplay.md",):
@@ -94,9 +97,7 @@ def validate_task(task_dir: Path) -> dict[str, object]:
             raise ProductionDesignError(f"Missing current screenplay input: {relative}")
     catalog = load_asset_catalog(task_dir)
     performance = load_character_performance_map(task_dir)
-    screenplay = load_screenplay_file(
-        task_dir / "screenplay-writer" / "screenplay.md"
-    )
+    screenplay = load_screenplay_file(task_dir / "screenplay-writer" / "screenplay.md")
     plan = load_production_design_plan(
         task_dir, performance=performance, screenplay=screenplay
     )
@@ -106,9 +107,7 @@ def validate_task(task_dir: Path) -> dict[str, object]:
         segment["scene_id"] for segment in performance["scene_segment_calls"]
     }
     planned_scene_ids = {
-        scene_id
-        for location in plan["locations"]
-        for scene_id in location["scene_ids"]
+        scene_id for location in plan["locations"] for scene_id in location["scene_ids"]
     }
     if planned_scene_ids != expected_scene_ids:
         raise ProductionDesignError(
@@ -126,12 +125,23 @@ def validate_task(task_dir: Path) -> dict[str, object]:
             f"expected={expected_speaker_count}, "
             f"actual={voice_result['speaker_count']}"
         )
+    role_voice_gate = None
+    if (
+        project_context.get("target_language") == "Arabic"
+        and project_context.get("speech_audio_source") == "elevenlabs_dubbed"
+    ):
+        role_voice_gate = validate_role_voice_map(task_dir)
     return {
         "status": "PASS",
         "asset_count": len(catalog["assets"]),
         "individual_character_count": len(plan["characters"]),
         "anonymous_ensemble_count": anonymous_ensemble_count,
         "speaker_voice_count": voice_result["speaker_count"],
+        "distinct_elevenlabs_voice_count": (
+            role_voice_gate["distinct_voice_id_count"]
+            if role_voice_gate is not None
+            else 0
+        ),
         "location_master_count": len(plan["locations"]),
         "aesthetic_reference_frame_count": (
             aesthetic_reference["reference_count"]
@@ -148,7 +158,11 @@ def main() -> int:
     try:
         result = validate_task(args.task_dir)
     except Exception as exc:
-        print(json.dumps({"status": "FAIL", "error": str(exc)}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"status": "FAIL", "error": str(exc)}, ensure_ascii=False, indent=2
+            )
+        )
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

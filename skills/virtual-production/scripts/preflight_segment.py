@@ -5,9 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
+
+from validate_segment_scripts import validate_task as validate_segment_scripts
 
 from narrated_fable_drama.contracts.segment import (
     CAPABILITY_PROFILE_RELATIVE,
@@ -18,10 +22,19 @@ from narrated_fable_drama.contracts.segment import (
     load_execution_plan,
     parse_segment_script,
     read_json,
+    require_prompt_audit,
     sha256_file,
     storyboard_segment_rows,
 )
-from validate_segment_scripts import validate_task as validate_segment_scripts
+from narrated_fable_drama.contracts.segment.common import REPOSITORY_ROOT
+
+PRODUCTION_DESIGN_VALIDATOR = (
+    REPOSITORY_ROOT
+    / "skills"
+    / "direct-production-design"
+    / "scripts"
+    / "validate_production_design.py"
+)
 
 
 def _is_npc_ensemble_asset_id(asset_id: object) -> bool:
@@ -31,6 +44,42 @@ def _is_npc_ensemble_asset_id(asset_id: object) -> bool:
 OBSERVATION_ARGUMENT_RE = re.compile(
     r"^(segment-[0-9]{3,})=(segment-[0-9]{3,}__attempt-[0-9]{4,})$"
 )
+
+
+def _require_current_asset_department_gate(
+    task_dir: Path,
+) -> dict[str, Any]:
+    """Block Seedance when Saudi voice assets or their provenance are stale."""
+
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(PRODUCTION_DESIGN_VALIDATOR),
+                "--task-dir",
+                str(task_dir),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        payload = json.loads(completed.stdout)
+    except (
+        OSError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+    ) as exc:
+        raise SegmentRuntimeError(
+            "Could not execute the asset-department Saudi voice gate"
+        ) from exc
+    if completed.returncode != 0 or payload.get("status") != "PASS":
+        detail = payload.get("error") or completed.stderr.strip()
+        raise SegmentRuntimeError(
+            "Asset-department Saudi voice gate failed: "
+            f"{detail or 'unknown validation failure'}"
+        )
+    return payload
 
 
 def parse_predecessor_observations(values: list[str] | None) -> dict[str, str]:
@@ -272,15 +321,21 @@ def predecessor_observation_requirement(
         label="predecessor production record",
     )
     attempt_id = source_record.get("provider_attempt_id")
+    predecessor_video_path = (
+        source_root / "video.mp4"
+        if source_record.get("status") == "GENERATED"
+        else source_root / "seedance-source.mp4"
+    )
     if (
-        source_record.get("status") != "GENERATED"
+        source_record.get("status") not in {"PICTURE_GENERATED", "GENERATED"}
         or source_record.get("segment_id") != source_segment_id
         or not isinstance(attempt_id, str)
         or not OBSERVATION_ARGUMENT_RE.fullmatch(f"{segment_id}={attempt_id}")
-        or not (source_root / "video.mp4").is_file()
+        or not predecessor_video_path.is_file()
+        or not (source_root / "last-frame.png").is_file()
     ):
         raise SegmentRuntimeError(
-            f"{segment_id} has no current generated predecessor to review"
+            f"{segment_id} has no current Seedance predecessor picture to review"
         )
     runtime_attempts = {
         item.get("source_provider_attempt_id")
@@ -361,7 +416,7 @@ def predecessor_observation_requirement(
         "segment_id": segment_id,
         "source_segment_id": source_segment_id,
         "source_provider_attempt_id": attempt_id,
-        "predecessor_video_path": str((source_root / "video.mp4").resolve()),
+        "predecessor_video_path": str(predecessor_video_path.resolve()),
         "segment_script_path": str(
             (task_dir / SCRIPT_DIR_RELATIVE / f"{segment_id}.md").resolve()
         ),
@@ -446,10 +501,14 @@ def preflight_segment(
     segment_id = segment_script_path.stem
     expected = (task_dir / SCRIPT_DIR_RELATIVE / f"{segment_id}.md").resolve()
     if segment_script_path != expected:
-        raise SegmentRuntimeError(f"Segment Script must use the current path: {expected}")
+        raise SegmentRuntimeError(
+            f"Segment Script must use the current path: {expected}"
+        )
+    asset_department_gate = _require_current_asset_department_gate(task_dir)
     validate_segment_scripts(task_dir, segment_ids=None)
     validate_segment_scripts(task_dir, segment_ids=[segment_id])
     parsed = parse_segment_script(segment_script_path)
+    prompt_audit = require_prompt_audit(task_dir, parsed)
     plan = load_execution_plan(task_dir, segment_id)
     observation = validate_predecessor_observation_gate(
         task_dir=task_dir,
@@ -479,7 +538,21 @@ def preflight_segment(
     if not isinstance(capabilities, dict) or not isinstance(project_policy, dict):
         raise SegmentRuntimeError("Seedance capability profile is incomplete")
     if (
-        project_policy.get(
+        project_policy.get("prompt_authoring_contract")
+        != (
+            "skills/virtual-production/references/"
+            "seedance-2-prompt-authoring-contract.md"
+        )
+        or project_policy.get("prompt_authoring_structure")
+        != "three_section_eight_element"
+        or project_policy.get("reference_token_policy")
+        != "stable_provider_order_with_readable_noun_after_every_use"
+        or project_policy.get("prompt_internal_audit_required") is not True
+        or project_policy.get("prompt_internal_audit_contract")
+        != "seedance-prompt-internal-audit/v3"
+        or project_policy.get("provider_prompt_must_match_audited_hash")
+        is not True
+        or project_policy.get(
             "maximum_direct_extension_hops_without_quality_reset"
         )
         != 0
@@ -496,10 +569,19 @@ def preflight_segment(
     if (
         parameters.get("model") != profile.get("model_id")
         or parameters.get("duration") != parsed["duration"]
+        or parameters.get("generate_audio") is not parsed["generate_audio"]
+        or parameters.get("generate_audio") is not True
+        or parsed["generate_audio"] is not True
+        or parsed["seedance_audio_mode"]
+        != "original_audio_dialogue_replacement"
+        or project_policy.get("seedance_generate_audio") is not True
+        or project_policy.get("seedance_audio_mode")
+        != "original_audio_dialogue_replacement"
         or capabilities.get("native_audio_generation") is not True
-        or capabilities.get("native_background_audio_generation") is not True
     ):
-        raise SegmentRuntimeError(f"{segment_id} is incompatible with the verified model")
+        raise SegmentRuntimeError(
+            f"{segment_id} is incompatible with the verified model"
+        )
     expected_reset = extension_quality_reset_schedule(
         storyboard_segment_rows(
             task_dir,
@@ -557,6 +639,9 @@ def preflight_segment(
     return {
         "status": "PASS",
         "segment_id": segment_id,
+        "prompt_audit_contract": prompt_audit["contract"],
+        "prompt_audit_status": prompt_audit["status"],
+        "prompt_audit_ruleset_sha256": prompt_audit["ruleset_sha256"],
         "model_id": parameters["model"],
         "duration_seconds": parameters["duration"],
         "operation": plan["shooting_plan"]["operation"],
@@ -602,8 +687,23 @@ def preflight_segment(
         "predecessor_observation": (
             "NO_ISSUES_CURRENT_ATTEMPT" if observation is not None else "NOT_REQUIRED"
         ),
+        "asset_department_gate": {
+            "status": asset_department_gate["status"],
+            "speaker_voice_count": asset_department_gate[
+                "speaker_voice_count"
+            ],
+            "distinct_elevenlabs_voice_count": asset_department_gate[
+                "distinct_elevenlabs_voice_count"
+            ],
+        },
         "quality_reset": expected_reset["strategy"],
         "generate_audio": True,
+        "seedance_audio_mode": plan["audio_policy"]["seedance_audio_mode"],
+        "sound_effects_source": "seedance_native",
+        "dialogue_gap_fill_source": (
+            "digital_silence"
+        ),
+        "elevenlabs_usage_scope": "arabic_dialogue_only",
         "return_last_frame": True,
     }
 
@@ -630,7 +730,13 @@ def main() -> int:
             predecessor_observations=observations,
         )
     except Exception as exc:
-        print(json.dumps({"status": "FAIL", "error": str(exc)}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"status": "FAIL", "error": str(exc)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

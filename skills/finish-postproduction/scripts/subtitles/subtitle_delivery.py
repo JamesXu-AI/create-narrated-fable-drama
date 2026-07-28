@@ -9,6 +9,7 @@ from typing import Any
 
 from narrated_fable_drama.core.json_io import write_json_atomic
 from narrated_fable_drama.core.project_context import load_project_context
+from narrated_fable_drama.core.project_domain import SPEECH_AUDIO_SOURCE
 
 from .subtitle_alignment import sha256_file
 from .subtitle_compile import compile_cues
@@ -46,26 +47,34 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
             task_dir, style=style, srt_path=srt_path
         )
         project_context = load_project_context(task_dir)
-        if project_context.get("speech_audio_source") != "seedance_native":
+        if project_context.get("speech_audio_source") != SPEECH_AUDIO_SOURCE:
             raise SubtitleBuildError(
-                "screenplay.md must use seedance_native speech audio."
+                f"screenplay.md must use {SPEECH_AUDIO_SOURCE} speech audio."
             )
         audio_timeline_path = (
             task_dir / ".pending" / "finish-postproduction" / "audio-timeline.json"
         )
         audio_timeline = _load_json(audio_timeline_path)
-        if audio_timeline.get("seedance_background_music") is not True:
+        native_audio_policy = audio_timeline.get("native_audio_policy")
+        if (
+            not isinstance(native_audio_policy, dict)
+            or native_audio_policy.get("seedance_speech_in_delivery") is not False
+        ):
             raise SubtitleBuildError(
-                "audio-timeline.json must declare seedance_background_music=true"
+                "audio-timeline.json lacks the validated dialogue-replacement policy"
+            )
+        if audio_timeline.get("seedance_background_music") is not False:
+            raise SubtitleBuildError(
+                "audio-timeline.json must declare seedance_background_music=false"
             )
         music_provider = audio_timeline.get("music_provider")
-        if music_provider != "seedance":
+        if music_provider != "none":
             raise SubtitleBuildError(
-                "Main final delivery requires music_provider=seedance"
+                "Arabic branch requires music_provider=none"
             )
-        if audio_timeline.get("background_music_source") != "seedance_native":
+        if audio_timeline.get("background_music_source") != "none":
             raise SubtitleBuildError(
-                "Main final delivery requires Seedance-native background music"
+                "Arabic branch requires background_music_source=none"
             )
         boundary_qc_path = (
             task_dir
@@ -114,12 +123,28 @@ def build(task_dir: Path, style_path: Path, *, render: bool) -> dict[str, Any]:
             "video_stream_present": captioned_probe["video_stream_present"],
             "audio_stream_present": captioned_probe["audio_stream_present"],
             "audio_sources": {
-                "voice_audio_source": "speaker_reference_audio",
-                "dialogue_source": "seedance",
-                "native_background_audio_source": "seedance_ambience_foley_and_music",
-                "seedance_background_music": True,
-                "background_music_source": "seedance_native",
-                "generate_audio": True,
+                "voice_audio_source": "elevenlabs_voice_id",
+                "dialogue_source": "elevenlabs",
+                "native_background_audio_source": native_audio_policy[
+                    "native_ambience_source"
+                ],
+                "action_sound_effects_source": "seedance_native",
+                "elevenlabs_usage_scope": "arabic_dialogue_only",
+                "seedance_background_music": False,
+                "background_music_source": "none",
+                "seedance_generate_audio": native_audio_policy[
+                    "seedance_generate_audio"
+                ],
+                "seedance_audio_use": native_audio_policy[
+                    "seedance_audio_use"
+                ],
+                "seedance_audio_in_delivery": native_audio_policy[
+                    "seedance_audio_in_delivery"
+                ],
+                "seedance_speech_in_delivery": False,
+                "dialogue_replacement_segment_ids": native_audio_policy[
+                    "dialogue_replacement_segment_ids"
+                ],
             },
             "audio_timeline": str(audio_timeline_path.resolve()),
             "model_repair_plan": boundary_qc.get("model_repair_plan"),

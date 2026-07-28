@@ -5,17 +5,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from validate_segment_scripts import validate_task as validate_segment_scripts
+
 from narrated_fable_drama.contracts.segment import (
     SCRIPT_DIR_RELATIVE,
     load_execution_plan,
-    parse_segment_script as parse_local_segment_prompt,
+    require_audited_model_prompt,
+    require_prompt_audit,
     sha256_json,
     storyboard_segment_rows,
     token_sort_key,
 )
+from narrated_fable_drama.contracts.segment import (
+    parse_segment_script as parse_local_segment_prompt,
+)
 from narrated_fable_drama.core.project_context import load_project_context
 from narrated_fable_drama.providers import runtime as provider_runtime
 from narrated_fable_drama.providers import seedance
+
 from .common import (
     DEPARTMENT_DIRNAME,
     GENERATION_DIRNAME,
@@ -26,13 +33,13 @@ from .common import (
 from .reset import (
     ensure_white_model_predecessor,
 )
-from validate_segment_scripts import validate_task as validate_segment_scripts
 
 
 def parse_segment_script(path: Path, *, task_dir: Path | None = None) -> dict[str, Any]:
     path = path.expanduser().resolve()
     task_root = task_dir.expanduser().resolve() if task_dir else path.parents[3]
     parsed = parse_local_segment_prompt(path)
+    prompt_audit = require_prompt_audit(task_root, parsed)
     plan = load_execution_plan(task_root, parsed["segment_id"])
     if plan.get("source_script_sha256") != parsed["script_sha256"]:
         raise SegmentGenerationError(f"{path.name} execution plan is stale")
@@ -60,6 +67,7 @@ def parse_segment_script(path: Path, *, task_dir: Path | None = None) -> dict[st
         "prompt": parsed["prompt"],
         "script_path": path,
         "script_sha256": parsed["script_sha256"],
+        "prompt_audit": prompt_audit,
         "execution_plan": plan,
         "execution_plan_sha256": sha256_json(plan),
         "references": static_images,
@@ -74,12 +82,20 @@ def parse_segment_script(path: Path, *, task_dir: Path | None = None) -> dict[st
         "audio_policy": plan.get(
             "audio_policy",
             {
-                "seedance_audio_mode": "native_sync",
-                "dialogue_source": "seedance",
-                "silent_mouth_performance": False,
+                "seedance_audio_mode": "original_audio_dialogue_replacement",
+                "dialogue_source": "elevenlabs_final",
+                "sound_effects_source": "seedance_native",
+                "dialogue_gap_fill_source": (
+                    "digital_silence"
+                ),
+                "elevenlabs_usage_scope": "arabic_dialogue_only",
+                "seedance_speech_forbidden": True,
+                "seedance_background_audio_retained": True,
+                "seedance_audio_in_delivery": True,
                 "native_background_audio": True,
-                "seedance_background_music": True,
-                "background_music_source": "seedance_native",
+                "seedance_dialogue_replacement_required": True,
+                "seedance_background_music": False,
+                "background_music_source": "none",
             },
         ),
     }
@@ -90,8 +106,8 @@ def _task_contract(task_dir: Path) -> dict[str, str]:
     return {
         "resolution": context["resolution"],
         "ratio": context["aspect_ratio"],
-        "seedance_audio_mode": "native_sync",
-        "dialogue_source": "seedance",
+        "seedance_audio_mode": "original_audio_dialogue_replacement",
+        "dialogue_source": "elevenlabs_final",
     }
 
 
@@ -144,7 +160,7 @@ def _runtime_reference_media_content(
     )
     source_record = read_json(source_dir / "production-record.json")
     if (
-        source_record.get("status") != "GENERATED"
+        source_record.get("status") not in {"PICTURE_GENERATED", "GENERATED"}
         or source_record.get("provider_attempt_id") != source_attempt_id
     ):
         raise SegmentGenerationError(
@@ -159,11 +175,11 @@ def _runtime_reference_media_content(
         if source_kind == "provider_last_frame":
             source = source_dir / "last-frame.png"
             provider_type = "image_url"
-            url = source_record.get("last_frame_source_url")
+            url = None
         elif source_kind == "complete_predecessor_video":
-            source = source_dir / "video.mp4"
+            source = source_dir / "seedance-source.mp4"
             provider_type = "video_url"
-            url = source_record.get("video_source_url")
+            url = None
         elif source_kind == "white_model_predecessor_video":
             source = ensure_white_model_predecessor(
                 segment,
@@ -183,6 +199,10 @@ def _runtime_reference_media_content(
             )
         if not source.is_file():
             raise SegmentGenerationError(f"Missing runtime evidence for {token}")
+        # Provider result URLs can be syntactically valid TOS URLs while still
+        # being private or expired as a later Seedance input. Re-upload the
+        # accepted local evidence to project-owned public storage before every
+        # successor request instead of reusing the provider output URL.
         if not isinstance(url, str) or not url.startswith(("http://", "https://")):
             url = provider_runtime.tos_upload_path(
                 source, kind=f"inputs/{source_kind.replace('_', '-')}"
@@ -215,6 +235,11 @@ def request_payload(
     request_timeout: int = provider_runtime.DEFAULT_TIMEOUT,
 ) -> dict[str, Any]:
     parameters = segment["seedance_parameters"]
+    require_audited_model_prompt(
+        segment["prompt_audit"],
+        segment["prompt"],
+        segment_id=segment["generation_task_id"],
+    )
     if parameters["resolution"] != resolution or parameters["ratio"] != ratio:
         raise SegmentGenerationError(
             f"{segment['generation_task_id']} task output settings changed after materialization"
@@ -229,15 +254,11 @@ def request_payload(
         }
         for reference in segment["references"]
     )
-    media_content.extend(
-        {
-            "type": "audio_url",
-            "audio_url": {"url": reference["uri"]},
-            "role": "reference_audio",
-            "_provider_token": reference["provider_token"],
-        }
-        for reference in segment["audio_references"]
-    )
+    if segment["audio_references"]:
+        raise SegmentGenerationError(
+            f"{segment['generation_task_id']} cannot send audio references to "
+            "Seedance; the guide must come from the exact Prompt text"
+        )
     media_content.extend(
         _runtime_reference_media_content(
             segment,

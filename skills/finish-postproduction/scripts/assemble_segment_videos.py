@@ -122,12 +122,12 @@ def _render_filter(
         or not isinstance(tracks[0], dict)
         or not isinstance(tracks[0].get("events"), list)
     ):
-        raise TimelineError("Audio timeline must contain one explicit native track")
+        raise TimelineError("Audio timeline must contain one explicit dubbed track")
     native_events = tracks[0]["events"]
     if [item.get("segment_id") for item in native_events] != [
         record.segment_name for record in records
     ]:
-        raise TimelineError("Native-audio event coverage differs from Segment coverage")
+        raise TimelineError("Dubbed-audio event coverage differs from Segment coverage")
     bridges = audio_timeline.get("audio_bridges")
     if not isinstance(bridges, list):
         raise TimelineError("Audio timeline lacks explicit audio_bridges")
@@ -200,7 +200,9 @@ def _render_filter(
         duration = sum(source_out - source_in for source_in, source_out in picture_ranges)
         rendered_durations.append(duration)
         if not record.probe.has_audio:
-            raise TimelineError(f"{record.segment_name} has no Seedance native audio")
+            raise TimelineError(
+                f"{record.segment_name} has no ElevenLabs dubbed audio"
+            )
         color_adjustments = event.get("color_adjustments")
         if not isinstance(color_adjustments, list):
             raise TimelineError(
@@ -514,7 +516,7 @@ def assemble(
         / ".pending"
         / "finish-postproduction"
         / "post-production"
-        / "native-picture-lock.mp4"
+        / "dubbed-picture-lock.mp4"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     if not edl_only:
@@ -572,11 +574,11 @@ def assemble(
         rendered = probe_media(output)
         expected = float(picture_edl["duration_seconds"])
         if not rendered.has_audio:
-            raise TimelineError("Native picture lock has no audio stream")
+            raise TimelineError("Dubbed picture lock has no audio stream")
         if rendered.duration_seconds > MAX_FINAL_RUNTIME_SECONDS + 1e-3:
-            raise TimelineError("Native picture lock exceeds 240 seconds")
+            raise TimelineError("Dubbed picture lock exceeds 240 seconds")
         if abs(rendered.duration_seconds - expected) > 0.25:
-            raise TimelineError("Native picture-lock duration differs from its EDL")
+            raise TimelineError("Dubbed picture-lock duration differs from its EDL")
         picture_edl.update(
             {
                 "rendered_output": str(output.resolve()),

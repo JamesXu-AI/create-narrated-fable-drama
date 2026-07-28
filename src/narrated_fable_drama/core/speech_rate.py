@@ -1,19 +1,23 @@
-"""Shared strict speech-rate gate for screenplay, Storyboard, and Segment Prompts."""
+"""Arabic-only speech-rate gate shared by all spoken-authority stages."""
 
 from __future__ import annotations
 
 import re
 from typing import Any
 
+from narrated_fable_drama.core.project_domain import (
+    ProjectDomainError,
+    TARGET_LANGUAGE,
+    validate_arabic_dialogue,
+)
 
-MAX_CJK_CHARACTERS_PER_SECOND = 4.0
-MAX_WORDS_PER_SECOND = 2.6
+ARABIC_LANGUAGE_CODE = "ar"
+MAX_ARABIC_WORDS_PER_SECOND = 2.6
 LINE_START_END_ALLOWANCE_SECONDS = 0.25
 MINIMUM_SPEECH_WINDOW_SECONDS = 0.60
 
-_CJK_RE = re.compile(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]")
-_WORD_RE = re.compile(
-    r"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*|[\u0600-\u06ff]+|[^\W\d_]+",
+_ARABIC_WORD_RE = re.compile(
+    r"[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]+",
     re.UNICODE,
 )
 
@@ -23,32 +27,35 @@ class SpeechRateError(ValueError):
 
 
 def analyze_speech(text: str, window_seconds: float) -> dict[str, Any]:
-    if not isinstance(text, str) or not text.strip():
-        raise SpeechRateError("Speech text must be non-empty.")
+    try:
+        normalized = validate_arabic_dialogue(
+            text,
+            context="speech-rate gate",
+        )
+    except ProjectDomainError as exc:
+        raise SpeechRateError(str(exc)) from exc
     if isinstance(window_seconds, bool) or window_seconds <= 0:
         raise SpeechRateError("Speech window must be positive.")
-    cjk_count = len(_CJK_RE.findall(text))
-    without_cjk = _CJK_RE.sub(" ", text)
-    word_count = len(_WORD_RE.findall(without_cjk))
-    speaking_seconds = (
-        cjk_count / MAX_CJK_CHARACTERS_PER_SECOND
-        + word_count / MAX_WORDS_PER_SECOND
-    )
+    arabic_word_count = len(_ARABIC_WORD_RE.findall(normalized))
+    if arabic_word_count <= 0:
+        raise SpeechRateError("Speech-rate gate found no Arabic words.")
+    speaking_seconds = arabic_word_count / MAX_ARABIC_WORDS_PER_SECOND
     required = max(
         MINIMUM_SPEECH_WINDOW_SECONDS,
         speaking_seconds + LINE_START_END_ALLOWANCE_SECONDS,
     )
     return {
-        "cjk_character_count": cjk_count,
-        "word_count": word_count,
+        "language": TARGET_LANGUAGE,
+        "language_code": ARABIC_LANGUAGE_CODE,
+        "arabic_only_no_latin": "PASS",
+        "arabic_word_count": arabic_word_count,
         "window_seconds": round(float(window_seconds), 3),
         "required_seconds": round(required, 3),
-        "cjk_characters_per_second": round(
-            cjk_count / float(window_seconds), 3
+        "arabic_words_per_second": round(
+            arabic_word_count / float(window_seconds),
+            3,
         ),
-        "words_per_second": round(word_count / float(window_seconds), 3),
-        "maximum_cjk_characters_per_second": MAX_CJK_CHARACTERS_PER_SECOND,
-        "maximum_words_per_second": MAX_WORDS_PER_SECOND,
+        "maximum_arabic_words_per_second": MAX_ARABIC_WORDS_PER_SECOND,
         "status": "PASS" if float(window_seconds) + 1e-6 >= required else "FAIL",
     }
 
@@ -60,10 +67,8 @@ def require_speech_rate(
     if result["status"] != "PASS":
         raise SpeechRateError(
             f"{stage} {line_id} speech window {result['window_seconds']:.3f}s "
-            f"is below the strict {result['required_seconds']:.3f}s minimum "
-            f"({result['cjk_character_count']} CJK characters at at most "
-            f"{MAX_CJK_CHARACTERS_PER_SECOND:.1f}/s; "
-            f"{result['word_count']} words at at most "
-            f"{MAX_WORDS_PER_SECOND:.1f}/s; plus line allowance)."
+            f"is below the strict Arabic {result['required_seconds']:.3f}s "
+            f"minimum ({result['arabic_word_count']} Arabic words at at most "
+            f"{MAX_ARABIC_WORDS_PER_SECOND:.1f}/s; plus line allowance)."
         )
     return {"line_id": line_id, **result}

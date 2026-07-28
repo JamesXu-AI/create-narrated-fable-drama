@@ -1,6 +1,6 @@
 ---
 name: create-narrated-fable-drama
-description: Produce a complete 16:9 AI-narrated drama or fable from a user-supplied Story, including a target-country question when missing, screenplay, production design, storyboard, self-contained Seedance prompts, guided one-at-a-time generation, audiovisual review, subtitles, and final masters. Use for external narration, character storytellers, framing conversations, embedded tales, or mixed character-dialogue and narration.
+description: Produce a complete Arabic 16:9 AI-narrated drama or fable from a user-supplied Story, using mandatory Seedance native audio and mouth performance, mandatory generated-speech replacement with exact ElevenLabs Arabic, guided one-at-a-time generation, audiovisual review, subtitles, and final masters.
 ---
 
 # Narrated Fable Drama
@@ -45,7 +45,7 @@ Before writing the screenplay:
 4. Use the latest conversational Visual Style, defaulting to
    `3D Healing Animation`.
 5. Use the latest conversational resolution, defaulting to `1080p`.
-6. Record country, target language, style, resolution, and `16:9` format in
+6. Record country, fixed target language `Arabic`, style, resolution, and `16:9` format in
    `screenplay-writer/screenplay.md`.
 
 The Story and country conversation are the complete intake; create no separate
@@ -61,6 +61,10 @@ story.md
 -> direct-production-design/production-design-plan.json + workspace/assets/assets.json
 -> previsualize-cinematography/storyboard.md
 -> one exact Seedance Prompt per Generation Segment
+-> virtual-production independent internal Prompt audit PASS
+-> Seedance picture, mouth performance, and mandatory native audio
+-> mandatory removal of every generated character voice
+-> Seedance-native dialogue-cut repair plus immediately mixed exact ElevenLabs Arabic
 -> accepted Segment media
 -> final masters and subtitles
 ```
@@ -108,15 +112,43 @@ review, and final edit:
 5. Execute `virtual-production`. Author every first-pass `segment-NNN.md` directly
    from the Storyboard, then require the complete Prompt-set and speech-rate gate
    to pass, including copied visible-character economy, eyeline axis, per-Shot
-   size, close-up dominance, and every position-change exception; derive runtime
-   transport in memory.
+   size, close-up dominance, exact-Arabic mouth performance, one explicit
+   Seedance audio mode, mandatory generated-speech replacement, and every
+   position-change exception. Then run virtual-production's separate internal
+   hard gate. Require every exact Prompt to pass the three-section, eight-element,
+   readable-reference, single-camera-family, quality/anti-distortion,
+   Storyboard-authority, and Arabic audio-ownership checks. A changed Prompt,
+   Storyboard, reference, or audit ruleset invalidates the PASS record; derive
+   runtime transport in memory only from that unchanged audited Prompt.
 6. Begin the Segment human loop only now. Before every Seedance call, present the
    compact plan and wait for confirmation.
    One confirmation authorizes one attempt for one Segment.
-7. After every attempt, inspect the complete video with sound, report the result,
-   including visible-character economy, eyeline-axis continuity, close-up
-   dominance, and every position-change widening exception, then wait for the
-   user's accept/revise/retry/stop decision.
+7. After every successful Seedance attempt, publish the immutable provider result
+   plus its last frame as `PICTURE_GENERATED`, start the current Segment's audio
+   build immediately, and treat picture and audio as separate review tracks.
+   Directly review the provider picture for continuity, visible-character economy,
+   eyeline-axis continuity, close-up dominance, and every position-change
+   widening exception. A current-attempt picture review returning `NO_ISSUES`
+   releases that picture as predecessor evidence: after a separate fresh human
+   confirmation, another Segment process may submit the reviewed successor while
+   the current Segment's audio build continues.
+
+   The audio track must preserve the untouched provider original as
+   `seedance-source.mp4`, cut generated character speech with bounded edge
+   padding, verify the cleaned background, hard-mute the complete Seedance mix
+   inside dialogue intervals, preserve Seedance-native ambience and action sound
+   unchanged outside them, derive a conservative masculine pronunciation-only
+   tashkeel rendering from immutable Storyboard text, and insert only the
+   resulting exact ElevenLabs Arabic dialogue fitted to the detected
+   mouth-performance window. Use Multilingual v2 with the approved neutral urban
+   Riyadh Saudi voice asset; ElevenLabs may never generate
+   ambience, action sound, Foley, animal sounds, music, or any other non-dialogue
+   audio. Do not defer or batch this audio work. Only after the audio and
+   voice-identity gates pass may the current Segment become `GENERATED`, undergo
+   complete audiovisual review, and wait for the user's
+   accept/revise/retry/stop decision. An audio-only failure blocks acceptance and
+   postproduction, but does not invalidate the reviewed picture or stop an already
+   authorized successor Seedance job.
 8. After every Segment is individually accepted, present the assembly plan and
    wait for final-render confirmation.
 9. Execute `finish-postproduction` and wait for final human acceptance.
@@ -137,12 +169,14 @@ Require the screenplay, Storyboard, and final Prompt to state:
 - whether a J-cut, L-cut, completed phrase, breath, action result, or silence makes
   the switch natural;
 - whether the speaker is visually present, cropped but present, or absent; and
-- which image and voice references are included or deliberately omitted.
+- which image references are included or deliberately omitted, and which
+  ElevenLabs voice ID owns each speaking entity.
 
 When a storyteller becomes voice-only over an embedded tale, do not bind that
-character's positive image reference to the embedded Segment. Bind the approved
-voice reference, state that the same voice continues, and explicitly forbid the
-storyteller's body, portrait, reflection, silhouette, or duplicate.
+character's positive image or audio reference to Seedance. Keep the established
+ElevenLabs voice ID for later dubbing, state that the same voice continues, and
+explicitly forbid the storyteller's body, portrait, reflection, silhouette, or
+duplicate.
 
 ## Human gates
 
@@ -150,8 +184,11 @@ Before the complete Segment Prompt gate, pause only for missing mandatory countr
 a material creative choice that cannot be inferred, or destructive overwrite.
 After that gate, pause:
 
-- before each video generation or destructive overwrite;
-- after each generated video;
+- before each Seedance generation or destructive overwrite;
+- after picture review when requesting the fresh authorization for a successor
+  Seedance attempt;
+- after the current Segment's complete audiovisual review for its
+  accept/revise/retry/stop decision;
 - when a material story commitment cannot be inferred safely; and
 - before final assembly.
 

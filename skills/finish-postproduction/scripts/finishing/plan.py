@@ -819,7 +819,7 @@ def _validate_boundary_plan(
         or incoming_fade != 0.0
     ):
         raise RepairPlanError(
-            f"{boundary_id} no_op must preserve a zero-overlap native hard cut"
+            f"{boundary_id} no_op must preserve a zero-overlap source hard cut"
         )
 
     expected_protected = [

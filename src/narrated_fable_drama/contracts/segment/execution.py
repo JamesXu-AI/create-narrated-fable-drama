@@ -40,14 +40,15 @@ def _source_attempt(task_dir: Path, source_segment_id: str) -> str:
     )
     attempt_id = record.get("provider_attempt_id")
     if (
-        record.get("status") != "GENERATED"
+        record.get("status") not in {"PICTURE_GENERATED", "GENERATED"}
         or record.get("segment_id") != source_segment_id
         or not isinstance(attempt_id, str)
-        or not (source_root / "video.mp4").is_file()
+        or not (source_root / "seedance-source.mp4").is_file()
         or not (source_root / "last-frame.png").is_file()
     ):
         raise SegmentRuntimeError(
-            f"Dependent Prompt requires the current generated attempt for {source_segment_id}"
+            "Dependent Prompt requires the current Seedance picture attempt for "
+            f"{source_segment_id}"
         )
     return attempt_id
 
@@ -111,6 +112,10 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
     for binding in sorted(row["bindings"], key=lambda item: token_sort_key(item["provider_token"])):
         token = binding["provider_token"]
         role = binding["provider_role"]
+        if role == "reference_audio":
+            raise SegmentRuntimeError(
+                f"{segment_id} must not submit audio references to guide-only Seedance"
+            )
         namespace = binding["asset_namespace"]
         if namespace == "continuity" or role == "reference_video":
             dependencies = row["depends_on_segment_ids"]
@@ -126,7 +131,7 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
                     if quality_reset["required"]
                     else "complete_predecessor_video"
                 )
-                audio_policy = "preserved"
+                audio_policy = "stripped"
             else:
                 source_kind = "provider_last_frame"
                 audio_policy = "none"
@@ -279,13 +284,21 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
         "final_visible_state": row["final_visible_state"],
         "final_sound_state": row["final_sound_state"],
         "audio_policy": {
-            "seedance_audio_mode": "native_sync",
-            "dialogue_source": "seedance",
-            "voice_audio_source": "speaker_reference_audio",
-            "silent_mouth_performance": False,
+            "seedance_audio_mode": "original_audio_dialogue_replacement",
+            "dialogue_source": "elevenlabs_final",
+            "voice_audio_source": "elevenlabs_voice_id",
+            "sound_effects_source": "seedance_native",
+            "dialogue_gap_fill_source": (
+                "digital_silence"
+            ),
+            "elevenlabs_usage_scope": "arabic_dialogue_only",
+            "seedance_speech_forbidden": True,
+            "seedance_background_audio_retained": True,
+            "seedance_audio_in_delivery": True,
             "native_background_audio": True,
-            "seedance_background_music": True,
-            "background_music_source": "seedance_native",
+            "seedance_dialogue_replacement_required": True,
+            "seedance_background_music": False,
+            "background_music_source": "none",
         },
     }
     return result

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the authored semantic-boundary picture and native-audio timeline."""
+"""Compile the authored picture and ElevenLabs-dubbed Arabic audio timeline."""
 
 from __future__ import annotations
 
@@ -18,8 +18,15 @@ from narrated_fable_drama.contracts.segment import (
     sha256_json,
     storyboard_segment_rows,
 )
+from narrated_fable_drama.core.arabic_pronunciation import (
+    has_current_arabic_pronunciation_contract,
+)
 from narrated_fable_drama.core.json_io import load_json_object, write_json_atomic
 from narrated_fable_drama.core.project_context import load_project_context
+from narrated_fable_drama.core.project_domain import (
+    SOUND_EFFECTS_AUDIO_SOURCE,
+    SPEECH_AUDIO_SOURCE,
+)
 from narrated_fable_drama.media.ffmpeg import MediaCommandError
 from narrated_fable_drama.media.probe import (
     fraction_as_float,
@@ -52,6 +59,7 @@ class SegmentRecord:
     script_path: Path
     probe: MediaProbe
     fields: dict[str, Any]
+    dubbing: dict[str, Any]
 
 
 def _load_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -105,9 +113,46 @@ def _screenplay_story_plans(
 
 def _validate_project_audio(task_dir: Path) -> dict[str, Any]:
     context = load_project_context(task_dir)
-    if context["speech_audio_source"] != "seedance_native":
-        raise TimelineError("screenplay.md Speech Audio Source must be seedance_native")
+    if context["speech_audio_source"] != SPEECH_AUDIO_SOURCE:
+        raise TimelineError(
+            f"screenplay.md Speech Audio Source must be {SPEECH_AUDIO_SOURCE}"
+        )
     return context
+
+
+def _valid_segment_dubbing(dubbing: Any) -> bool:
+    if not isinstance(dubbing, dict):
+        return False
+    cleaned_gate = dubbing.get("seedance_clean_background_speech_gate")
+    audio_edit = dubbing.get("seedance_audio_edit")
+    return (
+        dubbing.get("contract")
+        == "seedance-original-audio-dialogue-replacement/v2"
+        and has_current_arabic_pronunciation_contract(dubbing)
+        and dubbing.get("speech_audio_source") == SPEECH_AUDIO_SOURCE
+        and dubbing.get("sound_effects_audio_source")
+        == SOUND_EFFECTS_AUDIO_SOURCE
+        and dubbing.get("native_audio_full_duration") is True
+        and dubbing.get("elevenlabs_usage_scope") == "arabic_dialogue_only"
+        and dubbing.get("elevenlabs_non_dialogue_request_count") == 0
+        and dubbing.get("dialogue_gap_fill_source")
+        in {
+            "digital_silence",
+            "not_required",
+        }
+        and dubbing.get("seedance_speech_forbidden") is True
+        and dubbing.get("seedance_speech_in_delivery") is False
+        and dubbing.get("picture_frames_retimed") is False
+        and dubbing.get("alignment_method")
+        == "seedance_detected_or_storyboard_window_natural_phrase_atempo"
+        and dubbing.get("seedance_generate_audio") is True
+        and dubbing.get("seedance_audio_in_delivery") is True
+        and dubbing.get("seedance_background_audio_retained") is True
+        and isinstance(cleaned_gate, dict)
+        and cleaned_gate.get("status") == "PASS"
+        and isinstance(audio_edit, dict)
+        and audio_edit.get("status") in {"APPLIED", "NOT_REQUIRED"}
+    )
 
 
 def _authored_audio_handoff(boundary: dict[str, Any]) -> str:
@@ -187,6 +232,12 @@ def discover_segments(
             or production_record.get("status") != "GENERATED"
         ):
             raise TimelineError(f"{segment_name} is not a completed generated Segment")
+        dubbing = production_record.get("dubbing")
+        if not _valid_segment_dubbing(dubbing):
+            raise TimelineError(
+                f"{segment_name} lacks completed phrase-aligned ElevenLabs "
+                "Arabic embedding"
+            )
         voice_gate = production_record.get("voice_identity_gate")
         if voice_gate is not None and (
             not isinstance(voice_gate, dict)
@@ -225,8 +276,7 @@ def discover_segments(
         probe = probe_media(video)
         if not probe.has_audio:
             raise TimelineError(
-                f"{segment_name} lacks required Seedance native "
-                "dialogue/foley/ambience audio"
+                f"{segment_name} lacks required ElevenLabs Arabic dialogue audio"
             )
         if probe.duration_seconds <= 0 or probe.duration_seconds > 15.25:
             raise TimelineError(f"{segment_name} has invalid generated duration")
@@ -238,6 +288,7 @@ def discover_segments(
                 script_path=script.resolve(),
                 probe=probe,
                 fields=fields,
+                dubbing=dubbing,
             )
         )
     return records
@@ -334,7 +385,7 @@ def compile_timelines(
             )
         native_events.append(
             {
-                "event_id": f"native-{record.segment_name}",
+                "event_id": f"elevenlabs-{record.segment_name}",
                 "segment_id": record.segment_name,
                 "source": str(record.video_path),
                 "source_in_seconds": round(audio_source_in, 6),
@@ -345,14 +396,18 @@ def compile_timelines(
                 "timeline_out_seconds": round(audio_start + audio_duration, 6),
                 "duration_seconds": round(audio_duration, 6),
                 "purpose": (
-                    "seedance_native_dialogue_foley_ambience_and_background_music"
+                    "elevenlabs_exact_arabic_dialogue_with_seedance_original_"
+                    "nondialogue_audio_and_seedance_native_gap_fill"
                 ),
                 "has_source_audio": True,
-                "voice_audio_source": "speaker_reference_audio",
-                "dialogue_source": "seedance",
-                "native_ambience_source": "seedance",
-                "background_music_source": "seedance_native",
-                "seedance_background_music": True,
+                "voice_audio_source": "elevenlabs_voice_id",
+                "dialogue_source": "elevenlabs",
+                "native_ambience_source": (
+                    "seedance_original_nondialogue_plus_native_gap_fill"
+                ),
+                "action_sound_effects_source": "seedance_native",
+                "background_music_source": "none",
+                "seedance_background_music": False,
                 "preserve_lip_sync": True,
                 "gain_db": audio_plan["gain_db"],
                 "fade_in_seconds": audio_plan["fade_in_seconds"],
@@ -465,33 +520,47 @@ def compile_timelines(
         "picture_events": picture_events,
         "boundaries": boundaries,
     }
+    replacement_segment_ids = [record.segment_name for record in records]
     audio_timeline = {
-        "contract": "finish-native-audio-timeline/v2",
+        "contract": "finish-elevenlabs-dubbed-audio-timeline/v1",
         "duration_seconds": round(cursor, 6),
         "native_audio_policy": {
-            "generate_audio": True,
-            "voice_audio_source": "speaker_reference_audio",
-            "dialogue_source": "seedance",
-            "native_ambience_source": "seedance",
-            "seedance_background_music": True,
-            "background_music_source": "seedance_native",
+            "seedance_generate_audio": True,
+            "seedance_audio_use": (
+                "non_dialogue_original_audio_after_character_speech_replacement"
+            ),
+            "seedance_audio_in_delivery": True,
+            "seedance_speech_in_delivery": False,
+            "voice_audio_source": "elevenlabs_voice_id",
+            "dialogue_source": "elevenlabs",
+            "native_ambience_source": (
+                "seedance_original_nondialogue_and_native_gap_fill"
+            ),
+            "action_sound_effects_source": "seedance_native",
+            "elevenlabs_usage_scope": "arabic_dialogue_only",
+            "seedance_background_music": False,
+            "background_music_source": "none",
             "preserve_clip_sync": True,
             "automatic_silence_padding": False,
             "model_authored_event_placement": True,
             "terminal_audio": repair_plan["terminal_audio"],
+            "dialogue_replacement_segment_ids": replacement_segment_ids,
         },
         "tracks": [
             {
-                "track_id": "native-sync",
-                "source": "seedance",
-                "role": "synchronized_dialogue_foley_and_ambience",
+                "track_id": "mixed-segment-audio",
+                "source": "accepted_segment_media",
+                "role": (
+                    "elevenlabs_exact_arabic_dialogue_plus_segment_safe_"
+                    "background_audio"
+                ),
                 "events": native_events,
             }
         ],
         "audio_bridges": bridge_events,
-        "music_provider": "seedance",
-        "seedance_background_music": True,
-        "background_music_source": "seedance_native",
+        "music_provider": "none",
+        "seedance_background_music": False,
+        "background_music_source": "none",
     }
     return picture_edl, audio_timeline
 

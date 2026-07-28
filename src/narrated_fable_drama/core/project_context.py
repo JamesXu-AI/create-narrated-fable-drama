@@ -24,6 +24,7 @@ REQUIRED_FIELDS = (
     "Aspect Ratio",
     "Resolution",
     "Speech Audio Source",
+    "Sound Effects Audio Source",
     "Story Premise",
     "Fable Meaning",
     "Framing and Embedded Story Strategy",
@@ -98,6 +99,7 @@ def load_project_context(task_dir: str | Path) -> dict[str, Any]:
         "aspect_ratio": values["Aspect Ratio"],
         "resolution": values["Resolution"],
         "speech_audio_source": values["Speech Audio Source"],
+        "sound_effects_audio_source": values["Sound Effects Audio Source"],
     }
     validate_project_context(context, context=str(root / SCREENPLAY_RELATIVE))
     if runtime < 1 or runtime > 240:

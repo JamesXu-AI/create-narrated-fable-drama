@@ -21,7 +21,7 @@ def screenplay_speech_rate_gate(screenplay: dict[str, Any]) -> dict[str, Any]:
                     continue
                 result = require_speech_rate(
                     line_id=dialogue["line_id"],
-                    text=dialogue["spoken_text_en"],
+                    text=dialogue["spoken_text_ar"],
                     window_seconds=float(shot["duration_seconds"]),
                     stage=f"screenplay {segment_id}/{shot['shot_id']}",
                 )
@@ -37,9 +37,11 @@ def screenplay_speech_rate_gate(screenplay: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": "PASS",
         "stage": "screenplay_full",
+        "language": "Arabic",
+        "language_code": "ar",
+        "arabic_only_no_latin": "PASS",
         "line_count": len(lines),
-        "maximum_cjk_characters_per_second": 4.0,
-        "maximum_words_per_second": 2.6,
+        "maximum_arabic_words_per_second": 2.6,
         "minimum_margin_seconds": round(
             min(
                 (
@@ -51,4 +53,3 @@ def screenplay_speech_rate_gate(screenplay: dict[str, Any]) -> dict[str, Any]:
             3,
         ),
     }
-

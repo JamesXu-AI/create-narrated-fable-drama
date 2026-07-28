@@ -88,7 +88,6 @@ def probe(path: Path) -> dict[str, Any]:
     try:
         payload = probe_json(path)
         duration = float(payload["format"]["duration"])
-        streams = payload["streams"]
     except (KeyError, TypeError, ValueError, MediaCommandError) as exc:
         raise EvidenceError(f"Unreadable media metadata: {path}") from exc
     video = stream_by_type(payload, "video")
@@ -117,7 +116,9 @@ def probe(path: Path) -> dict[str, Any]:
 def require_audio(metadata: dict[str, Any], path: Path) -> dict[str, Any]:
     audio = metadata.get("audio")
     if not isinstance(audio, dict):
-        raise EvidenceError(f"A readable native audio stream is required: {path}")
+        raise EvidenceError(
+            f"A readable ElevenLabs-dubbed audio stream is required: {path}"
+        )
     return {
         "stream_index": audio.get("index"),
         "codec": audio.get("codec_name"),

@@ -1,6 +1,6 @@
 ---
 name: finish-postproduction
-description: Act as the editing and restoration master for accepted 16:9 AI narrated-drama or fable Seedance media; inspect actual picture and sound, decide evidence-based cuts and repairs, preserve exact dialogue and voice continuity, compile Storyboard-authoritative subtitles, and render verified clean and captioned masters. Use for final assembly, seam repair, pacing correction, audio-continuity repair, boundary color correction, and delivery finishing.
+description: Act as the editing and restoration master for accepted 16:9 Seedance media after mandatory generated-speech replacement and exact ElevenLabs Arabic mixing; perform the unified final edit, preserve dialogue/mouth synchronization, compile subtitles, and render verified masters.
 ---
 
 # Finish Postproduction
@@ -69,13 +69,15 @@ The model inspects and selects candidates. The tool never ranks them.
 
 - assemble exactly one accepted clip per Storyboard Generation Segment;
 - preserve 16:9 delivery at the screenplay-selected resolution and synchronized
-  Seedance-native speech, narration,
-  ambience, effects, and restrained music;
+  ElevenLabs Arabic dialogue plus Seedance-native full-duration ambience and
+  authored action effects on the accepted picture;
 - keep an established character storyteller's voice continuous across on-camera
   dialogue, on-camera storytelling, off-camera storytelling, and return to the
   framing scene;
-- never revoice, paraphrase, replace native speech, move lip sync, invent a
-  transition, or conceal a generation defect;
+- never revoice, paraphrase, replace ElevenLabs speech, move lip sync, invent a
+  transition, admit Seedance character speech, or conceal a generation defect;
+  validated Seedance non-dialogue audio may remain only outside recorded
+  replacement intervals;
 - decide trim points, picture transitions, audio handoffs, ambience bridges,
   loudness adjustments, and bounded visual repairs from actual media evidence;
 - preserve the authored few-character, explicit-eyeline-axis, close-up-led
@@ -109,7 +111,7 @@ python3 skills/finish-postproduction/scripts/finish_postproduction.py \
 ## Subtitles
 
 `load_segment_handoff` derives exact line text and speaker order directly from
-Storyboard Ordered Shots. The final clean master's native audio is the mandatory
+Storyboard Ordered Shots. The final clean master's ElevenLabs-dubbed audio is the mandatory
 timing source: align every authoritative line to measured word timestamps after
 all picture and audio edits are complete. ASR is timing evidence only and is never
 text authority.
@@ -122,6 +124,20 @@ Missing final audio, an unavailable alignment model, low token coverage, or an
 alignment outside the owning Segment blocks delivery. Never fall back to
 Storyboard speech windows or editorial timing overrides.
 
+This branch's subtitle gate is Arabic-only. It requires
+`Target Language=Arabic`, forces multilingual ASR with `language=ar`, rejects
+English-only `.en` models, rejects Latin letters in authoritative or observed
+speech, and records `language_code=ar`. Arabic line length and reading speed use
+the Arabic-specific style keys; legacy Latin/English subtitle limits are not
+valid gate inputs.
+
+Hard-subtitle rendering uses the SHA-256-pinned
+`assets/fonts/NotoSansArabic-Variable.ttf` file under this Skill and selects its
+named `SemiBold` instance. Never resolve or silently substitute a system font.
+Require the declared Pillow dependency and verify RAQM/FriBiDi shaping support
+before rendering; missing shaping support or a missing/mismatched bundled font is
+a delivery blocker.
+
 ## Deliver
 
 ```text
@@ -133,6 +149,6 @@ finish-postproduction/subtitles/master.srt
 finish-postproduction/subtitles/master.vtt
 ```
 
-Both masters must match in duration and synchronized native audio. The captioned
+Both masters must match in duration and synchronized dubbed audio. The captioned
 master adds subtitle pixels only. Report `FINAL_MASTER_READY`, present the actual
 files and checks, then wait for human acceptance.

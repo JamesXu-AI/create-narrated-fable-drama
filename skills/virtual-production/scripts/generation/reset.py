@@ -73,10 +73,10 @@ def _white_model_reset_contract() -> tuple[Path, dict[str, Any]]:
         "operation": "video_edit",
         "strategy": "white_model_video_edit",
         "duration": -1,
-        "generate_audio": True,
+        "generate_audio": False,
         "watermark": False,
         "return_last_frame": False,
-        "preserve_source_audio_by_remux": True,
+        "preserve_source_audio_by_remux": False,
     }
     if any(value.get(key) != expected for key, expected in required.items()):
         raise SegmentGenerationError("White-model quality-reset contract is invalid")
@@ -88,8 +88,8 @@ def _white_model_reset_contract() -> tuple[Path, dict[str, Any]]:
     return path, value
 
 
-def _remux_source_audio(
-    *, white_model_video: Path, source_video: Path, output_video: Path
+def _strip_white_model_audio(
+    *, white_model_video: Path, output_video: Path
 ) -> None:
     try:
         run_media_command(
@@ -98,31 +98,23 @@ def _remux_source_audio(
             "-y",
             "-i",
             str(white_model_video),
-            "-i",
-            str(source_video),
             "-map",
             "0:v:0",
-            "-map",
-            "1:a:0",
             "-c:v",
             "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-shortest",
+            "-an",
             str(output_video),
             ],
-            context="White-model source-audio remux",
+            context="White-model audio stripping",
             timeout=180,
         )
     except MediaCommandError as exc:
         raise SegmentGenerationError(
-            "Could not preserve predecessor audio in white-model reset"
+            "Could not strip audio from white-model reset"
         ) from exc
     if not output_video.is_file():
         raise SegmentGenerationError(
-            "Could not preserve predecessor audio in white-model reset"
+            "Could not strip audio from white-model reset"
         )
 
 
@@ -152,7 +144,10 @@ def ensure_white_model_predecessor(
         raise SegmentGenerationError(
             f"{segment['generation_task_id']} white-model quality-reset contract is stale"
         )
-    source_video = source_dir / "video.mp4"
+    # Quality reset is visual continuity work. Use the immutable Seedance source
+    # so it can start while ElevenLabs dubbing for the predecessor is still
+    # running, and never feed the dubbed track back into Seedance.
+    source_video = source_dir / "seedance-source.mp4"
     source_probe = _probe_media(source_video)
     source_record = read_json(source_dir / "production-record.json")
     source_url = source_record.get("video_source_url")
@@ -210,7 +205,7 @@ def ensure_white_model_predecessor(
         if output_video.is_file() and record_path.is_file():
             record = read_json(record_path)
             if all(record.get(key) == value for key, value in expected_identity.items()):
-                _probe_media(output_video)
+                _probe_media(output_video, require_audio=False)
                 return output_video
             raise SegmentGenerationError(
                 f"{segment['generation_task_id']} cached white-model output is stale"
@@ -284,12 +279,11 @@ def ensure_white_model_predecessor(
         raw_video = attempt_dir / "white-model-provider.mp4"
         provider_runtime.download_url(video_url, raw_video, timeout=request_timeout)
         _probe_media(raw_video, require_audio=False)
-        _remux_source_audio(
+        _strip_white_model_audio(
             white_model_video=raw_video,
-            source_video=source_video,
             output_video=output_video,
         )
-        output_probe = _probe_media(output_video)
+        output_probe = _probe_media(output_video, require_audio=False)
         if abs(
             float(output_probe["duration_seconds"])
             - float(source_probe["duration_seconds"])
@@ -305,7 +299,7 @@ def ensure_white_model_predecessor(
                 "provider_task_id": task_id,
                 "attempt_number": attempt_number,
                 "visual_source": "seedance_white_model_video_edit",
-                "audio_source": "remuxed_complete_predecessor",
+                "audio_source": "none",
                 "media_probe": output_probe,
             },
         )

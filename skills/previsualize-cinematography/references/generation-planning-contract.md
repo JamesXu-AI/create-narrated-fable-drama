@@ -119,7 +119,7 @@ For a complete-predecessor extension:
 - continue the next forward performance and action phase without replay;
 - require `white_model_video_edit` on the first and every permitted extension:
   runtime turns the approved predecessor into a pure-white 3D structural proxy and
-  remuxes the predecessor's synchronized audio onto it;
+  strips all audio from it;
 - use that proxy for motion, pose, camera, timing, spatial structure, and action
   phase only; and
 - bind the current Location master and one high-resolution identity/appearance

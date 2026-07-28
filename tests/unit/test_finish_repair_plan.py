@@ -27,7 +27,11 @@ from assemble_segment_videos import _render_filter  # noqa: E402
 from boundary.qc import _measure_master_sample  # noqa: E402
 from boundary.qc_evidence import _extract_frame_evidence  # noqa: E402
 from post_timeline import TimelineError, _authored_audio_handoff  # noqa: E402
-from subtitles.subtitle_compile import _source_time_to_retained_time  # noqa: E402
+from subtitles.subtitle_compile import (  # noqa: E402
+    _clamp_intervals_to_segment,
+    _source_time_to_retained_time,
+)
+from subtitles.subtitle_style import SubtitleBuildError  # noqa: E402
 
 
 def _sha(path: Path) -> str:
@@ -39,6 +43,31 @@ def _write_json(path: Path, value: dict[str, object]) -> None:
         json.dumps(value, ensure_ascii=False, sort_keys=True),
         encoding="utf-8",
     )
+
+
+class SubtitleSegmentOwnershipTests(unittest.TestCase):
+    def test_small_alignment_spill_is_clamped_to_owning_segment(self) -> None:
+        self.assertEqual(
+            _clamp_intervals_to_segment(
+                [(13.962, 19.84)],
+                segment_start=14.542,
+                segment_end=29.583,
+                cue_id="L-003",
+            ),
+            [(14.542, 19.84)],
+        )
+
+    def test_large_alignment_spill_still_blocks_delivery(self) -> None:
+        with self.assertRaisesRegex(
+            SubtitleBuildError,
+            "outside its owning Segment",
+        ):
+            _clamp_intervals_to_segment(
+                [(13.9, 19.84)],
+                segment_start=14.542,
+                segment_end=29.583,
+                cue_id="L-003",
+            )
 
 
 def _fixture(tmp_path: Path) -> tuple[list[object], Path, dict[str, object]]:

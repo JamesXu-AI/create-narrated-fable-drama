@@ -47,7 +47,7 @@ Storyboard never resets them to defaults.
 Use a `Field | Value` table that states target country, target language, runtime,
 aspect ratio, audience point of view, visual progression, camera grammar,
 shot-size/intimacy grammar, visible-character economy, eyeline-axis grammar,
-lighting/color grammar, production-design motifs, performance grammar, native-audio
+lighting/color grammar, production-design motifs, performance grammar, Arabic-dubbing
 grammar, and editorial rhythm. Use exact field names `Visible Character Economy`,
 `Eyeline Axis Grammar`, and `Shot Size and Intimacy Grammar`. The values must state
 the fewest-character composition baseline, how A/B screen sides and the camera side
@@ -201,8 +201,8 @@ change, voice identity, acoustic perspective, ambience crossfade, and music
 behavior. A character storyteller remains the same voice when moving on/off camera.
 
 When a storyteller becomes voice-only over an embedded tale, state that the
-embedded Segment omits the storyteller and listener positive image references,
-retains only the approved voice reference when needed, and forbids their body,
+embedded Segment omits the storyteller and listener positive image and audio
+references, retains only the speaker entity ID for later ElevenLabs dubbing, and forbids their body,
 portrait, reflection, silhouette, or duplicate. References are request-wide; Shot
 prose cannot switch them off.
 
@@ -249,9 +249,15 @@ Use:
 Provider Token | Provider Role | Asset Namespace | Readable Subject | Purpose | Shot Scope | Forbidden Inheritance
 ```
 
-Provider tokens use `@ImageN`, `@VideoN`, or `@AudioN`. Each token gets one clear
-purpose stated in natural language. `Asset Namespace` is internal runtime mapping;
-`Readable Subject` is the human-facing character, place, prop, or voice name virtual production
+Provider tokens use `@ImageN` or `@VideoN`; `@AudioN` remains forbidden.
+Storyboard dialogue windows provide timing authority for dialogue replacement;
+they are not wholesale audio-cut intervals. Only detected character speech is
+removed, the mixed Seedance track is digitally silent inside those cuts and
+unchanged elsewhere, and ElevenLabs owns only the final Arabic character voices.
+Silent Seedance generation is invalid.
+Each token gets one clear purpose stated in natural
+language. `Asset Namespace` is internal runtime mapping;
+`Readable Subject` is the human-facing character, place, or prop name virtual production
 must use. A token may be repeated only when it has genuinely separate purposes.
 
 The Location token owns the dressed set and its production-design-approved embedded
@@ -291,7 +297,8 @@ from the plan. The successor's Reference Plan must make every character/Location
 input auditable during that check. Every video extension, including the first, uses
 the white-model quality reset: its `@Video` is structural/motion evidence only,
 while the Location master and one current high-resolution identity/appearance image
-for every declared role restores the final look.
+for every declared role restores the final look; predecessor audio is stripped
+before Seedance.
 
 `Coverage Reset Requirement` is `not_required` unless the immediately prior
 same-Scene boundary used either a soft last-frame reference or an extension. The
@@ -308,7 +315,7 @@ action is unfinished, repack or finish it before this boundary.
 Use one row per ordered internal shot:
 
 ```text
-Shot | Screenplay Shot | Shot Size | Transition and Camera | Subject Action and Expression | Space, Blocking and Gaze | Persistent Anchors | Lighting and Color | Dialogue and Native Audio | Landing and Edit
+Shot | Screenplay Shot | Shot Size | Transition and Camera | Subject Action and Expression | Space, Blocking and Gaze | Persistent Anchors | Lighting and Color | Dialogue and Dubbing Audio | Landing and Edit
 ```
 
 For every Shot:
@@ -358,12 +365,12 @@ L-NNN; window=START-END; speaker=entity-id; mode=delivery_mode; transition=T-NNN
 ```
 
   `START-END` is the Segment-local subtitle/edit window in seconds. Every speech
-  window must pass the shared strict rate gate: no more than 4.0 CJK
-  characters/second or 2.6 non-CJK words/second, with 0.25 seconds of line
-  start/end allowance. The complete Storyboard blocks release if any Line fails.
-  A cell with no speech begins with `none;` and still describes ambience, effects,
-  and silence;
-- state native ambience, effects, music, silence, and the settled landing;
+  window must pass the shared strict Arabic gate: the text contains Arabic
+  script, contains no Latin letters, and uses no more than 2.6 Arabic
+  words/second, with 0.25 seconds of line start/end allowance. The complete
+  Storyboard blocks release if any Line fails.
+  A cell with no speech begins with `none;` and describes intentional silence;
+- state exact ElevenLabs voice continuity, silence, and the settled landing;
 - use editorial timing descriptions when they clarify the event. Keep exact source
   timing in planning authority, but virtual production must translate it into event order and
   natural rhythm instead of model-facing ranges such as `0-3 seconds`.
@@ -381,8 +388,8 @@ position-change exception into the final Prompt.
 Also state the media budget decision. Prefer four or five total provider references
 when sufficient and order identity-critical references first, but treat those as
 recommendations only. Bind an identity/appearance-state image for every
-provider-renderable role, including physically present audio-only and offscreen
-roles. Keep `remain_absent` states out of provider media. Repack only when the
+provider-renderable visible/present role. Keep `remain_absent` states and every
+audio reference out of Seedance provider media. Repack only when the
 complete required media set exceeds a verified provider capacity; never satisfy a
 recommendation by dropping a role image.
 

@@ -105,7 +105,7 @@ def _validate_execution_plan(
     if not isinstance(parameters, dict) or parameters.get("duration") != parsed["duration"]:
         raise SegmentRuntimeError(f"{segment_id} execution parameters are invalid")
     fixed = {
-        "generate_audio": True,
+        "generate_audio": parsed["generate_audio"],
         "watermark": False,
         "return_last_frame": True,
         "execution_expires_after": 172800,
@@ -289,6 +289,7 @@ def validate_task(
         "segment_count": len(selected),
         "segments": selected,
         "generate_audio": True,
+        "seedance_audio_mode": "original_audio_dialogue_replacement",
         "script_root": str(script_root),
         "execution_plan_storage": "in_memory_only",
         "first_full_prompt_gate": "PASS" if segment_ids is None else "PARTIAL_CHECK",
@@ -299,9 +300,11 @@ def validate_task(
                 if segment_ids is None
                 else "segment_prompts_partial"
             ),
+            "language": "Arabic",
+            "language_code": "ar",
+            "arabic_only_no_latin": "PASS",
             "line_count": len(speech_lines),
-            "maximum_cjk_characters_per_second": 4.0,
-            "maximum_words_per_second": 2.6,
+            "maximum_arabic_words_per_second": 2.6,
             "minimum_margin_seconds": round(
                 min(
                     (

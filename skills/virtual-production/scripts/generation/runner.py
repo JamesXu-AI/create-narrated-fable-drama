@@ -62,6 +62,31 @@ def _published_segment_ready(task_dir: Path, segment_id: str) -> bool:
     )
 
 
+def _published_picture_ready(task_dir: Path, segment_id: str) -> bool:
+    """Return whether Seedance picture can already feed a reviewed successor."""
+
+    directory = (
+        task_dir
+        / PENDING_DIRNAME
+        / DEPARTMENT_DIRNAME
+        / GENERATION_DIRNAME
+        / segment_id
+    )
+    record_path = directory / "production-record.json"
+    if not record_path.is_file():
+        return False
+    try:
+        record = read_json(record_path)
+    except SegmentGenerationError:
+        return False
+    return (
+        record.get("status") in {"PICTURE_GENERATED", "GENERATED"}
+        and record.get("segment_id") == segment_id
+        and (directory / "seedance-source.mp4").is_file()
+        and (directory / "last-frame.png").is_file()
+    )
+
+
 def _enforce_human_confirmation(
     *,
     task_dir: Path,
@@ -71,7 +96,7 @@ def _enforce_human_confirmation(
     new_segment_ids = [
         segment_id
         for segment_id in selected_segment_ids
-        if not _published_segment_ready(task_dir, segment_id)
+        if not _published_picture_ready(task_dir, segment_id)
     ]
     if len(new_segment_ids) > 1:
         raise SegmentGenerationError(
@@ -117,7 +142,7 @@ def _storyboard_topological_waves(
     missing_external = sorted(
         dependency
         for dependency in external
-        if not _published_segment_ready(task_dir, dependency)
+        if not _published_picture_ready(task_dir, dependency)
     )
     if missing_external:
         raise SegmentGenerationError(
@@ -184,26 +209,6 @@ def run(args: argparse.Namespace) -> int:
     selected_order = [
         segment["generation_task_id"] for segment in segments
     ]
-    blocked_voice_predecessors: list[str] = []
-    for segment_id in selected_order:
-        segment_index = all_segment_ids.index(segment_id)
-        if segment_index == 0:
-            continue
-        predecessor_id = all_segment_ids[segment_index - 1]
-        if (
-            _published_segment_ready(task_dir, predecessor_id)
-            and not recorded_voice_gate_allows_downstream(
-                task_dir,
-                predecessor_id,
-            )
-        ):
-            blocked_voice_predecessors.append(predecessor_id)
-    if blocked_voice_predecessors:
-        raise SegmentGenerationError(
-            "Successor generation is blocked by failed predecessor voice-identity "
-            "gates: "
-            + ", ".join(sorted(set(blocked_voice_predecessors)))
-        )
     selected_ids = set(selected_order)
     _enforce_human_confirmation(
         task_dir=task_dir,
@@ -236,7 +241,7 @@ def run(args: argparse.Namespace) -> int:
     announce(
         f"START segments={len(segments)} resolution={task['resolution']} "
         f"ratio={task['ratio']} "
-        f"audio_mode={task.get('seedance_audio_mode', 'native_sync')} "
+        "audio_mode=original_audio_dialogue_replacement "
         "scheduler=storyboard_shooting_plan_waves"
     )
     results: list[dict[str, Any]] = []
@@ -253,6 +258,10 @@ def run(args: argparse.Namespace) -> int:
     }
     for wave_number, wave_ids in enumerate(waves, start=1):
         for segment_id in wave_ids:
+            if _published_picture_ready(task_dir, segment_id):
+                # The provider picture already passed the submission gate. Audio
+                # resume must not demand the predecessor review a second time.
+                continue
             requirement = predecessor_observation_requirement(
                 task_dir=task_dir,
                 segment_id=segment_id,
@@ -408,8 +417,8 @@ def run(args: argparse.Namespace) -> int:
         "succeeded_count": len(results),
         "failed_count": len(failures),
         "generate_audio": True,
-        "seedance_audio_mode": task.get("seedance_audio_mode", "native_sync"),
-        "dialogue_source": task.get("dialogue_source", "seedance"),
+        "seedance_audio_mode": "original_audio_dialogue_replacement",
+        "dialogue_source": task.get("dialogue_source", "elevenlabs_final"),
         "results": results,
         "failures": failures,
         "voice_identity_gate_count": len(voice_identity_gates),
@@ -523,37 +532,60 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 @contextmanager
-def task_execution_lock(task_dir: Path):
+def task_execution_lock(
+    task_dir: Path,
+    segment_ids: list[str] | None,
+):
+    """Lock one task globally while allowing different Segments to overlap."""
+
     pending_root = task_dir / PENDING_DIRNAME / DEPARTMENT_DIRNAME
     pending_root.mkdir(parents=True, exist_ok=True)
-    lock_path = pending_root / EXECUTION_LOCK_FILENAME
-    handle = lock_path.open("a+", encoding="utf-8")
-    acquired = False
+    global_lock_path = pending_root / EXECUTION_LOCK_FILENAME
+    global_handle = global_lock_path.open("a+", encoding="utf-8")
+    segment_handles: list[tuple[Path, Any]] = []
+    global_acquired = False
     try:
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            acquired = True
+            global_mode = fcntl.LOCK_SH if segment_ids else fcntl.LOCK_EX
+            fcntl.flock(global_handle.fileno(), global_mode | fcntl.LOCK_NB)
+            global_acquired = True
         except BlockingIOError as exc:
             raise SegmentGenerationError(
-                "Another Seedance generation process already owns this task: "
+                "Another incompatible Seedance generation process owns this task: "
                 f"{task_dir}"
             ) from exc
+        for segment_id in sorted(set(segment_ids or [])):
+            lock_path = pending_root / f"generation-{segment_id}.lock"
+            handle = lock_path.open("a+", encoding="utf-8")
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                handle.close()
+                raise SegmentGenerationError(
+                    "Another Seedance generation process already owns "
+                    f"{segment_id}: {task_dir}"
+                ) from exc
+            segment_handles.append((lock_path, handle))
         yield
     finally:
-        try:
-            if acquired:
+        for lock_path, handle in reversed(segment_handles):
+            try:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        finally:
-            handle.close()
-            if acquired:
+            finally:
+                handle.close()
                 lock_path.unlink(missing_ok=True)
+        try:
+            if global_acquired:
+                fcntl.flock(global_handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            global_handle.close()
 
 
 def main() -> int:
     try:
         args = build_parser().parse_args()
         task_dir = args.task_dir.expanduser().resolve()
-        with task_execution_lock(task_dir):
+        with task_execution_lock(task_dir, args.segments):
             return run(args)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

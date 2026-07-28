@@ -1,6 +1,6 @@
 ---
 name: screenplay-writer
-description: Adapt one user-supplied Story into a 16:9 AI-narrated drama or fable screenplay with a known target country, exact dialogue, character storytellers, framing and embedded story worlds, natural dialogue-to-narration transitions, playable action, native sound, timing, and continuity.
+description: Adapt one user-supplied Story into an Arabic 16:9 AI-narrated drama or fable screenplay with exact Arabic dialogue, Seedance mouth-performance windows, mandatory ElevenLabs final voices, authored ambience/action effects, character storytellers, playable action, timing, and continuity.
 ---
 
 # Narrated Fable Drama Screenplay Writer
@@ -77,7 +77,7 @@ Every spoken line uses:
 ```text
 L-NNN; speaker=<entity>; mode=<delivery-mode>; gate=<visible/audible trigger>;
 transition=<breath/reaction/J-cut/L-cut/action/silence handoff>;
-delivery=<performance>; text="<exact target-language words>"
+delivery=<performance>; text="<exact Arabic words>"
 ```
 
 Valid modes:
@@ -105,17 +105,17 @@ needing the same positive character image both present and absent.
    causal turns, climax, consequence, ending, and implied fable meaning.
 2. Preserve the source. Improve only performance, pacing, legibility, and
    filmability unless the user authorizes a rewrite.
-3. Record target country, target language, `16:9`, conversational Visual Style
+3. Record target country, fixed target language `Arabic`, `16:9`, conversational Visual Style
    (default `3D Healing Animation`), conversational resolution (default `1080p`),
-   and `seedance_native` speech in Production Information.
+   and `elevenlabs_dubbed` speech in Production Information.
 4. Define every character once. Use `storyteller` or `both` only for a character
    who truly owns narration.
 5. Separate framing and embedded story locations and population.
 6. Author Scene-wide character lifecycles before Shot rows. A crop is not an exit.
 7. Write only Shots that create or reveal a dramatic change, using the
    few-character, explicit-axis, close-up-led doctrine above.
-8. Give every spoken line a trigger, delivery mode, natural transition, exact text,
-   listener response, and changed state.
+8. Give every spoken line a trigger, delivery mode, natural transition, exact
+   Arabic-script text without Latin letters, listener response, and changed state.
 9. Use Continuity Boundary `Audio Handoff` cells to carry exact J/L cuts, breaths,
    ambience crossfades, and returns between narrative layers.
 10. Keep project-wide visual role types at eight or fewer.

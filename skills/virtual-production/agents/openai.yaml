@@ -1,4 +1,4 @@
 interface:
   display_name: "Virtual Production · 虚拟制片"
-  short_description: "Generate narrated-drama and fable Seedance segments"
-  default_prompt: "Use $virtual-production to author every exact selected-style Seedance Prompt with explicit visible-character economy, A/B eyeline axis and screen directions, exact per-Shot size, ECU/CU/MCU dominance, and only labeled shortest position-change exceptions for wider views, reject extra/crowded characters and axis reversals, pass the complete Prompt and speech gates, then begin one-Segment-at-a-time human confirmation."
+  short_description: "Author and internally audit Seedance prompts"
+  default_prompt: "Use $virtual-production to author Storyboard-grounded Seedance Segment Prompts under the generation-time optimizer contract, run the separate internal audit gate, and submit only the unchanged audited Prompt after human confirmation."

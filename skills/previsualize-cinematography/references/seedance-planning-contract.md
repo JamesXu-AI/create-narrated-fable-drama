@@ -104,15 +104,18 @@ inertial or causal bridge between consecutive actions. Externalize emotion throu
 observable breath, eyes, posture, hands, shoulders, pace, and gaze rather than an
 abstract emotion label alone.
 
-## Use Seedance-readable audio notation
+## Plan silent Arabic mouth performance
 
-Keep exact dialogue and audio cues as readable authority text in `storyboard.md`.
-In Prompt Translation Notes, preserve these downstream conversion rules without
-writing the provider Prompt itself:
+Keep exact Arabic dialogue and dubbing windows as readable authority text in
+`storyboard.md`. In Prompt Translation Notes, preserve these downstream conversion
+rules without writing the provider Prompt itself:
 
-- dialogue becomes `{exact spoken words}`;
-- music becomes `(audible music cue)` when the project's audio policy permits it;
-- sound effects become `<audible source and event>`;
+- dialogue becomes `{exact Arabic words}` plus an explicit temporary audible
+  delivery and mouth-performance instruction;
+- Seedance generates native ambience/action audio and disposable character
+  speech. Preserve the original native track unchanged outside dialogue-removal
+  intervals and hard-mute the complete mix inside them
+  windows; ElevenLabs generates dialogue only, and music remains forbidden;
 - generated on-screen text or subtitles become `【exact text】` only when explicitly
   authorized.
 
@@ -121,12 +124,9 @@ hard Chinese pronunciations, retain story text in authority files and place an
 approved same-sounding common-character performance form only in the provider
 Prompt plus a traceable pronunciation note; never silently rewrite subtitle text.
 
-Describe a reference voice in audible terms as well as binding its audio: age,
-pitch, weight, texture, pace, energy, and delivery should agree with the line.
-
-This project's default main flow permits and requires Seedance-native background
-music, so every Segment plans at least one intentional music cue in readable prose.
-Keep it subordinate to dialogue and important effects. Generated subtitles remain
+Describe the intended ElevenLabs voice in audible terms—age, pitch, weight,
+texture, pace, energy, and delivery—but do not bind voice audio to Seedance. The speaking entity's
+ElevenLabs voice ID is resolved at dubbing time. Generated subtitles remain
 disabled; final captions are authored in postproduction.
 
 ## Close the Prompt with one global constraint block
@@ -156,7 +156,7 @@ provider behavior. Direct review still checks the actual video.
   separate generated clips for a strong action/scene turn.
 - Every permitted extension, including the first, uses the official mitigation:
   strictly edit the approved predecessor into a pure-white 3D white-model video,
-  preserve its original synchronized audio by remux, and pass that proxy as the
+  strip its audio, and pass that proxy as the
   extension's video input. Bind current high-resolution
   Location and performer identity/appearance images so the proxy supplies motion
   and structure rather than final appearance. The proxy is temporary and never
@@ -169,16 +169,16 @@ provider behavior. Direct review still checks the actual video.
 - At an accepted extension splice, downstream finishing may remove six outgoing
   frames and one incoming frame only when this Storyboard authors disposable
   action/dialogue handles. Do not create an EDL in previsualization.
-- Fade the terminal native-audio edge to zero over a short envelope so a narration
-  or spoken line cannot end with a digital click.
+- Fade the terminal ElevenLabs-dubbed audio edge to zero over an explicitly
+  authored envelope so a spoken line cannot end with a digital click.
 
 ## Review failure classes
 
 Inspect for identity drift, an unapproved celebrity-like face, unexpected text,
 subtitle, logo, watermark, style drift, duplicate subject, wrong performer count,
 missing/extra limb, unstable high-energy action, extension jump or replay,
-progressive extension degradation, incorrect effect logic, clipped terminal audio,
-mispronunciation, voice mismatch, crowded staging, axis reversal, insufficient
+progressive extension degradation, incorrect mouth performance, clipped
+terminal ElevenLabs audio, mispronunciation, voice mismatch, crowded staging, axis reversal, insufficient
 close-up dominance, and a wide Shot that does not cover a required position
 change. Route each problem to the owning department; never hide a generation defect
 in postproduction.

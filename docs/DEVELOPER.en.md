@@ -15,8 +15,13 @@ project.
 
 - Python 3.11 or higher;
 - When running media review and finishing, `ffmpeg` and `ffprobe` must be on `PATH`;
-- The FFmpeg used to burn in subtitles must support the `subtitles`/libass filter
-  and H.264 encoding;
+- The FFmpeg used to burn in subtitles must support the `movie` and `overlay`
+  filters plus H.264 encoding;
+- `python3 -m pip install -e .` installs Pillow for subtitle rendering. Arabic
+  shaping must have Pillow RAQM available, so the host also needs the FriBiDi
+  runtime library;
+- Subtitle rendering uses the repository-bundled, SHA-256-pinned OFL Noto Sans
+  Arabic font and does not depend on Tahoma, `fontconfig`, or `fc-match`;
 - Only the image, sound, and video generation stages require remote service
   configuration;
 - Uploading local reference media or persisting results to TOS requires the
@@ -29,6 +34,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -e .
 ```
+
+Verify Arabic shaping after installation:
+
+```bash
+python3 -c "from PIL import features; assert features.check_feature('raqm')"
+```
+
+If the check fails, install the FriBiDi runtime library for the host and reinstall
+an official Pillow wheel. A source build of Pillow must explicitly enable RAQM.
+Subtitle rendering never falls back to unshaped text or a system font.
 
 When you need TOS:
 
@@ -62,8 +77,9 @@ workspace/tasks/my-fable/
 ## Internal Technical Pipeline Architecture
 
 The diagram below shows the end-to-end technical data flow: which department owns
-each stage, the artifact each stage produces, the three full gates and per-clip
-audio/picture review, and where explicit human authorization is required. Solid
+each stage, the artifact each stage produces, the four full gates and per-clip
+picture-track and completed-audiovisual reviews, and where explicit human
+authorization is required. Solid
 arrows are the forward pipeline; dashed arrows are gate/review feedback that blocks
 downstream work until it passes.
 
@@ -82,7 +98,10 @@ flowchart TD
     end
     subgraph VP["virtual-production"]
         prompt["segment-NNN.md prompts"]
-        clip["generation-segments/segment-NNN/<br/>video.mp4 · last-frame.png · production-record.json"]
+        guide["Seedance picture + native audio + disposable guide speech"]
+        picture["PICTURE_GENERATED<br/>seedance-source.mp4 · last-frame.png"]
+        audio["Immediate audio track<br/>remove guide speech · preserve native non-dialogue sound<br/>insert only ElevenLabs Arabic dialogue"]
+        clip["generation-segments/segment-NNN/<br/>Seedance-native sound + ElevenLabs dialogue<br/>video.mp4 · last-frame.png · production-record.json"]
     end
     subgraph FP["finish-postproduction"]
         repair["llm-repair-plan.json"]
@@ -92,8 +111,11 @@ flowchart TD
     gate1{"Gate 1<br/>Screenplay + scope"}
     gate2{"Gate 2<br/>Storyboard"}
     gate3{"Gate 3<br/>Full prompt set"}
-    review{"Per-clip audio/picture review<br/>(video-review)"}
-    human(["Human authorization<br/>generate once · accept/redo/pause"])
+    gate4{"Gate 4<br/>Independent prompt audit"}
+    pictureReview{"Exact-attempt picture review<br/>NO_ISSUES releases predecessor evidence"}
+    avReview{"Completed audiovisual review<br/>(video-review)"}
+    human(["Fresh human authorization<br/>for each Seedance attempt"])
+    decision(["Current-Segment decision<br/>accept · revise · retry · pause"])
 
     story --> screenplay
     screenplay --> gate1
@@ -105,11 +127,19 @@ flowchart TD
     gate2 --> prompt
     prompt --> gate3
     gate3 -. blocks .-> prompt
-    gate3 --> human
-    human --> clip
-    clip --> review
-    review -. NO_ISSUES? redo .-> human
-    review --> repair
+    gate3 --> gate4
+    gate4 -. blocks .-> prompt
+    gate4 --> human
+    human --> guide
+    guide --> picture
+    picture --> pictureReview
+    picture --> audio
+    pictureReview -. reviewed successor + fresh confirmation .-> human
+    audio --> clip
+    clip --> avReview
+    avReview --> decision
+    decision -. picture retry needs fresh confirmation .-> human
+    decision --> repair
     repair --> master
 ```
 
@@ -135,8 +165,9 @@ Codex writes it according to the screenplay contract:
 TASK_DIR/screenplay-writer/screenplay.md
 ```
 
-The screenplay must record the target country, target language, visual style,
-resolution, `16:9`, estimated duration, and the `seedance_native` audio source.
+The screenplay must record the target country, fixed target language `Arabic`,
+visual style, resolution, `16:9`, estimated duration, and the
+`elevenlabs_dubbed` audio source.
 Every line contains:
 
 ```text
@@ -235,7 +266,7 @@ TASK_DIR/previsualize-cinematography/storyboard.md
 ```
 
 The storyboard is responsible for the final performance, cinematography, lighting,
-editing, native sound, inclusion/omission of reference images and voices,
+editing, ElevenLabs dubbing windows, inclusion/omission of reference images,
 Generation Segment division, and inter-segment continuity. It must preserve, line
 by line, the screenplay's exact text, speaker, delivery mode, mouth state,
 listener reactions, and audio/picture handoffs.
@@ -261,8 +292,11 @@ TASK_DIR/.pending/virtual-production/seedance-segment-scripts/segment-NNN.md
 ```
 
 The prompt must be self-contained with all shot order, action, performance, exact
-lines, mouth state, sound, references, exclusions, entry state, and end state.
-Creative meaning must not be shifted into the accompanying JSON.
+lines, mouth state, references, exclusions, entry state, and end state. It must
+state the sole audio policy: Seedance generates native ambience/action audio and
+audible temporary character speech for mouth guidance; post-production then
+removes every character voice and replaces it with exact ElevenLabs Arabic.
+Creative meaning must not be shifted into accompanying JSON.
 
 You must finish all first-version prompts before running the full validation
 without the `--segments` parameter:
@@ -279,7 +313,21 @@ first_full_prompt_gate=PASS
 speech_rate_gate.status=PASS
 ```
 
-is per-segment video generation allowed.
+Then run the independent internal Prompt audit:
+
+```bash
+.venv/bin/python \
+  skills/virtual-production/scripts/audit_segment_prompts.py \
+  --task-dir TASK_DIR --all
+```
+
+It checks that the complete model Prompt is Arabic except for required
+`@ImageN/@VideoN` tokens, plus the three-part structure, eight core elements,
+readable reference mappings, one dominant camera family per Shot, quality and
+anti-distortion fallback, Storyboard authority, and Arabic audio ownership. It
+writes one current `seedance-prompt-internal-audit/v3` PASS record per Segment. Any Prompt,
+Storyboard, reference, or ruleset change requires re-audit. Per-Segment video
+generation is allowed only after both full validation and independent audit pass.
 
 ### Stage 6: Per-Segment Generation and Review
 
@@ -287,7 +335,8 @@ Preflight the current segment before generating:
 
 ```bash
 python3 skills/virtual-production/scripts/preflight_segment.py \
-  --task-dir TASK_DIR --segment segment-NNN
+  --task-dir TASK_DIR \
+  --segment-script TASK_DIR/.pending/virtual-production/seedance-segment-scripts/segment-NNN.md
 ```
 
 After getting one explicit confirmation for this segment in the current
@@ -303,9 +352,28 @@ python3 skills/virtual-production/scripts/generate_segment_videos.py \
 
 If the current segment depends on the previous one, you may pass
 `--observed-predecessor SEGMENT_ID=PROVIDER_ATTEMPT_ID` as required by preflight
-only after the previous segment's exact provider attempt has completed
-audio/picture review, returned `NO_ISSUES`, and handled any necessary continuity
-fixes.
+only after direct review of the previous Segment's exact provider picture returns
+`NO_ISSUES` and any necessary continuity fixes are reflected in the successor.
+The predecessor's audio does not need to be complete. Picture `NO_ISSUES` releases
+only that exact predecessor attempt; every successor Seedance submission still
+needs its own fresh human confirmation.
+
+When the provider succeeds, virtual production first publishes the immutable
+`seedance-source.mp4`, last frame, and a `PICTURE_GENERATED` record. It immediately
+starts two separate tracks. The picture track reviews story action, identity,
+composition, continuity, last-frame usability, and the visual seam; after
+`NO_ISSUES`, another Segment process may submit the separately confirmed
+successor while the current audio track continues.
+
+The audio track starts immediately and may not be deferred or batched. It detects
+all character speech, cuts the speech intervals with bounded edge padding,
+hard-mutes the complete Seedance mix inside the cuts, preserves Seedance-native
+ambience and action sound unchanged outside them, and inserts exact Arabic with
+mapped ElevenLabs voices against the detected mouth timing. ElevenLabs generates
+Arabic dialogue only; it must never generate ambience, action sound, Foley,
+animal sounds, music, room tone, or any other non-dialogue audio. The mix does not
+retime picture frames. Only after the audio and voice-identity gates pass may the
+current Segment become `GENERATED` and enter complete audiovisual review.
 
 Successful current media lives at:
 
@@ -316,11 +384,13 @@ TASK_DIR/.pending/virtual-production/generation-segments/segment-NNN/
 └── production-record.json
 ```
 
-After each generation you must watch the full video at normal speed with sound,
-and check it item by item against the audio/picture review checklist listed under
-the README "Core Features · End-to-End Automatic QC & Correction." Even if review
-returns `NO_ISSUES`, you must wait for the user to decide accept, redo with
-changes, retry as-is, or pause; a failure does not trigger an automatic retry.
+After the audio track completes, watch the full video at normal speed with sound
+and check it item by item against the audiovisual checklist listed under the
+README "Core Features · End-to-End Automatic QC & Correction." Even if this
+complete review returns `NO_ISSUES`, the current Segment still waits for the user
+to decide accept, redo with changes, retry as-is, or pause. An audio-only failure
+blocks current-Segment acceptance and postproduction, but does not invalidate its
+reviewed picture or stop an already authorized successor Seedance job.
 
 ### Stage 7: Finishing and Delivery
 
@@ -364,9 +434,9 @@ python3 skills/finish-postproduction/scripts/finish_postproduction.py \
 
 Subtitle text comes directly from the Storyboard Ordered Shots; ASR is not the
 text authority. The clean and captioned masters must have equal duration and
-preserve synchronized native audio.
+preserve synchronized ElevenLabs Arabic dialogue.
 
-## The Six Production Departments
+## The Seven Production Departments
 
 Each department only modifies the artifacts it owns:
 
@@ -375,7 +445,7 @@ Each department only modifies the artifacts it owns:
 | `screenplay-writer` | `story.md`, country/style/resolution from the conversation | The single `screenplay.md`; story adaptation, exact lines, delivery mode, performance, state changes, narration switches |
 | `direct-production-design` | Story, validated screenplay, shared asset library | `production-design-plan.json`; characters, voices, wardrobe, props, locations, and the shared asset catalog |
 | `previsualize-cinematography` | Screenplay, production design, asset catalog | The single `storyboard.md`; performance, cinematography, lighting, editing, Segment division, reference binding, and continuity |
-| `virtual-production` | Validated storyboard | One complete `segment-NNN.md` prompt per segment; preflight, Seedance submission, and current generated media |
+| `virtual-production` | Validated storyboard | Author and audit each Prompt; submit Seedance picture plus native audio; hard-mute the mixed Seedance track in dialogue intervals, preserve it unchanged elsewhere, and mix only ElevenLabs Arabic dialogue; run the internal audio gates |
 | `video-review` | Authoritative documents or complete audio/picture clips | Independent review results; returns `NO_ISSUES` or minimal fixes routed to the responsible department |
 | `finish-postproduction` | All accepted Segments and real media evidence | Repair decisions, assembly, subtitles, clean/captioned masters, and the delivery manifest |
 
@@ -390,7 +460,7 @@ skills/video-review/SKILL.md
 skills/finish-postproduction/SKILL.md
 ```
 
-## The Three Full Gates
+## The Four Full Gates
 
 1. **Screenplay gate:** checks the full screenplay, character scope, and each
    line's owning Shot duration.
@@ -400,6 +470,11 @@ skills/finish-postproduction/SKILL.md
 3. **Prompt gate:** after all first-version prompts are finished, checks the
    complete set at once — per-shot framing, references, exact lines, exclusions,
    and local speaking windows.
+4. **Independent prompt-audit gate:** checks the exact compiled Prompt's
+   three-part structure, eight core elements, readable reference mapping, one
+   dominant camera family per Shot, quality/anti-distortion fallback, Storyboard
+   authority, and Arabic audio ownership. Prompt, Storyboard, reference, or
+   ruleset changes invalidate the prior PASS.
 
 Unified speech-rate hard limits:
 
@@ -450,7 +525,7 @@ create-narrated-fable-drama/
 │   ├── core/                         # Paths, context, JSON, speech rate, and common validation
 │   ├── contracts/                    # Screenplay, asset, Storyboard, and Segment contracts
 │   ├── media/                        # Unified FFmpeg/FFprobe boundary
-│   └── providers/                    # Seedream, Seedance, SeedAudio remote boundary
+│   └── providers/                    # Seedream, Seedance, SeedAudio, ElevenLabs boundary
 ├── skills/
 │   ├── screenplay-writer/
 │   ├── direct-production-design/
@@ -503,11 +578,22 @@ auto-load a repository `.env`. Do not commit secrets to the repository.
 | Seedance video creation | `ARK_BASE_URL`, `SEEDANCE_API_KEY`, `SEEDANCE_MODEL` |
 | Seedance query/cancel | `ARK_BASE_URL`, `SEEDANCE_API_KEY` |
 | SeedAudio voice | `SEEDAUDIO_API`, `SEEDAUDIO_API_KEY`, `SEEDAUDIO_MODEL` |
+| ElevenLabs Arabic dubbing | `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL_ID`, `ELEVENLABS_VOICE_MAP` |
 | TOS persistence | `STORAGE_TOS_REGION`, `STORAGE_TOS_ENDPOINT`, `STORAGE_TOS_BUCKET`, `STORAGE_TOS_ACCESS_KEY_ID`, `STORAGE_TOS_SECRET_ACCESS_KEY`, `STORAGE_TOS_KEY_PREFIX` |
 
 `ARK_BASE_URL` and `SEEDAUDIO_API` must be HTTPS. The current Seedream adapter
 only accepts the fixed model ID declared in code; using any other value fails
 immediately.
+
+`ELEVENLABS_VOICE_MAP` is a JSON object whose keys are screenplay Entity IDs and
+whose values are ElevenLabs Voice IDs, for example
+`{"grandfather":"voice-id-1","fox":"voice-id-2"}`. The optional
+`ELEVENLABS_OUTPUT_FORMAT` currently must be an `mp3_*` format and defaults to
+`mp3_44100_128`. `ELEVENLABS_MODEL_ID` must be exactly
+`eleven_multilingual_v2`. The Arabic branch does not treat `language_code=ar`
+as an accent lock: accent comes from the role asset's neutral urban Riyadh
+Saudi voice Prompt, while conservative Arabic diacritics are added only to the
+provider-only TTS rendering without changing authored dialogue.
 
 Safely inspect configuration status without printing secrets:
 
@@ -545,7 +631,9 @@ A custom root must contain `pyproject.toml` and `SKILL.md`.
 | Generation or review fails | No auto-retry; report the issue and obtain one fresh authorization for the current Segment |
 | Finishing reports missing current media | Confirm every Storyboard Segment has a matching `video.mp4` and `production-record.json` |
 | `ffmpeg`/`ffprobe` not found | Install FFmpeg and confirm the binaries are on `PATH` |
-| Subtitle burn-in fails | Use FFmpeg with the libass `subtitles` filter and an H.264 encoder |
+| Subtitle font is missing or its hash differs | Restore the pinned Noto Sans Arabic asset under `skills/finish-postproduction/assets/fonts/`; do not substitute a system font |
+| Pillow RAQM is unavailable | Install the FriBiDi runtime and an official Pillow wheel, then run the RAQM check from Requirements |
+| Subtitle burn-in fails | Confirm FFmpeg supports the `movie` and `overlay` filters plus an H.264 encoder |
 
 ## Development and Validation
 

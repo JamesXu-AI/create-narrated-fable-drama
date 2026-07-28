@@ -3,7 +3,7 @@
 ## Position in the finishing workflow
 
 Boundary QC runs after the current generated Segment set and authored picture EDL
-are available, before the native picture lock is rendered. A second deterministic
+are available, before the dubbed picture lock is rendered. A second deterministic
 audit runs against the rendered picture lock before it is promoted to the clean
 master. Caption burn-in always happens after this stage.
 
@@ -12,7 +12,7 @@ generated Segments + screenplay/Storyboard semantics
 -> real-source ±3s model-decision evidence
 -> model-authored explicit picture-and-sound plan
 -> pre-assembly technical measurements
--> native picture-lock render
+-> dubbed picture-lock render
 -> final-timeline boundary audit
 -> clean master
 -> subtitles and captioned master
@@ -21,7 +21,7 @@ generated Segments + screenplay/Storyboard semantics
 ## Decision evidence
 
 Before a plan exists, every boundary receives the predecessor's actual final 3.0
-seconds plus the successor's actual first 3.0 seconds with synchronized native
+seconds plus the successor's actual first 3.0 seconds with synchronized dubbed
 audio. The evidence manifest contains source SHA, provider attempt, exact source
 windows, six-second preview, contact sheet, waveform, silence intervals, loudness,
 True Peak, dialogue windows, and authored boundary semantics. The model uses the
@@ -42,7 +42,7 @@ The six-second observation window is not an automatic repair range.
 
 For every cut-like boundary, create exactly the predecessor's final 1.0 second plus
 the current Segment's opening 1.0 second from the model-authored EDL source points,
-with synchronized native audio. At 24 fps the sample contains exactly 48 ordered
+with synchronized ElevenLabs-dubbed audio. At 24 fps the sample contains exactly 48 ordered
 frames. For a dissolve or fade, render the explicit planned effect in a two-second
 sample centered on that transition instead of substituting a raw splice.
 

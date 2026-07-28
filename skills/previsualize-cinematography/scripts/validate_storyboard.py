@@ -44,7 +44,7 @@ ORDERED_SHOT_HEADERS = (
     "Space, Blocking and Gaze",
     "Persistent Anchors",
     "Lighting and Color",
-    "Dialogue and Native Audio",
+    "Dialogue and Dubbing Audio",
     "Landing and Edit",
 )
 STORYBOARD_SHOT_SIZES = {
@@ -287,7 +287,7 @@ def _validate_speech_transition_plan(task_dir: Path, text: str) -> int:
             )
         if exact_text not in text:
             raise StoryboardValidationError(
-                f"{line_id} exact target-language text is missing from Storyboard"
+                f"{line_id} exact Arabic text is missing from Storyboard"
             )
     return len(rows)
 
@@ -396,9 +396,11 @@ def _validate_storyboard_speech_rate(
     return {
         "status": "PASS",
         "stage": "storyboard_full",
+        "language": "Arabic",
+        "language_code": "ar",
+        "arabic_only_no_latin": "PASS",
         "line_count": len(reports),
-        "maximum_cjk_characters_per_second": 4.0,
-        "maximum_words_per_second": 2.6,
+        "maximum_arabic_words_per_second": 2.6,
         "minimum_margin_seconds": round(
             min(
                 (

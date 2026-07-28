@@ -329,7 +329,9 @@ def standalone_records_from_edl(
             )
         probe = _probe_standalone(source.resolve())
         if not probe.has_audio:
-            raise BoundaryQCError(f"Standalone Segment has no native audio: {source}")
+            raise BoundaryQCError(
+                f"Standalone Segment has no dubbed audio: {source}"
+            )
         records.append(_StandaloneRecord(segment_name, source.resolve(), probe))
     return records
 

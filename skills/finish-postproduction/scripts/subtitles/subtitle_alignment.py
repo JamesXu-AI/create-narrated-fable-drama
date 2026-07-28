@@ -1,4 +1,4 @@
-"""Align Storyboard-authoritative dialogue text to the final native audio."""
+"""Align Storyboard-authoritative Arabic text to final ElevenLabs-dubbed audio."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
+from narrated_fable_drama.core.project_domain import (
+    ProjectDomainError,
+    TARGET_LANGUAGE,
+    validate_arabic_dialogue,
+)
+
 from .subtitle_style import SubtitleBuildError
 
 TOKEN_RE = re.compile(
@@ -19,22 +25,8 @@ TOKEN_RE = re.compile(
     re.UNICODE,
 )
 
-LANGUAGE_CODES = {
-    "arabic": "ar",
-    "chinese": "zh",
-    "english": "en",
-    "french": "fr",
-    "german": "de",
-    "hindi": "hi",
-    "indonesian": "id",
-    "italian": "it",
-    "japanese": "ja",
-    "korean": "ko",
-    "portuguese": "pt",
-    "russian": "ru",
-    "spanish": "es",
-    "turkish": "tr",
-}
+ARABIC_LANGUAGE_CODE = "ar"
+ARABIC_LANGUAGE_FORMS = frozenset({"arabic", "ar", "ar-sa"})
 
 
 @dataclass(frozen=True)
@@ -71,21 +63,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _language_code(target_language: str) -> str | None:
+def _language_code(target_language: str) -> str:
     normalized = target_language.strip().casefold()
-    if normalized in LANGUAGE_CODES:
-        return LANGUAGE_CODES[normalized]
-    if re.fullmatch(r"[a-z]{2,3}", normalized):
-        return normalized
-    return None
+    if normalized not in ARABIC_LANGUAGE_FORMS:
+        raise SubtitleBuildError(
+            "Subtitle alignment is Arabic-only; target language must be "
+            "Arabic/ar/ar-SA."
+        )
+    return ARABIC_LANGUAGE_CODE
 
 
 def _model_name(model_family: str, target_language: str) -> str:
     family = model_family.strip()
     if not family:
         raise SubtitleBuildError("Subtitle alignment model family is empty.")
-    if _language_code(target_language) == "en" and not family.endswith(".en"):
-        return f"{family}.en"
+    _language_code(target_language)
+    if family.casefold().endswith(".en"):
+        raise SubtitleBuildError(
+            "Arabic subtitle alignment cannot use an English-only .en model."
+        )
     return family
 
 
@@ -145,13 +141,29 @@ def transcribe_final_audio(
         ) from exc
     if not words:
         raise SubtitleBuildError("Final-audio subtitle alignment produced no words.")
+    detected_language = str(info.language).strip().casefold()
+    if detected_language != ARABIC_LANGUAGE_CODE:
+        raise SubtitleBuildError(
+            "Final-audio subtitle alignment did not detect Arabic: "
+            f"{detected_language or 'unknown'}."
+        )
+    try:
+        validate_arabic_dialogue(
+            " ".join(word.text for word in words),
+            context="final-audio ASR evidence",
+        )
+    except ProjectDomainError as exc:
+        raise SubtitleBuildError(str(exc)) from exc
     return words, {
+        "language": TARGET_LANGUAGE,
+        "language_code": ARABIC_LANGUAGE_CODE,
+        "arabic_only_no_latin": "PASS",
         "model": model_name,
         "device": device,
         "compute_type": compute_type,
         "beam_size": beam_size,
         "vad_filter": vad_filter,
-        "detected_language": str(info.language),
+        "detected_language": detected_language,
         "detected_language_probability": round(
             float(info.language_probability),
             6,
@@ -178,7 +190,22 @@ def _observed_tokens(words: list[TimedWord]) -> list[ObservedToken]:
 def _similarity(expected: str, observed: str) -> float:
     if expected == observed:
         return 1.0
-    return SequenceMatcher(None, expected, observed, autojunk=False).ratio()
+    expected_forms = {expected}
+    observed_forms = {observed}
+    if expected.startswith("ال") and len(expected) > 3:
+        expected_forms.add(expected[2:])
+    if observed.startswith("ال") and len(observed) > 3:
+        observed_forms.add(observed[2:])
+    return max(
+        SequenceMatcher(
+            None,
+            expected_form,
+            observed_form,
+            autojunk=False,
+        ).ratio()
+        for expected_form in expected_forms
+        for observed_form in observed_forms
+    )
 
 
 def _match_cue_tokens(
@@ -271,10 +298,18 @@ def _resolved_token_timings(
         second = matches[second_index]
         assert first is not None and second is not None
         first_gap = second.word.start_seconds - first.word.end_seconds
+        first_duration = first.word.end_seconds - first.word.start_seconds
+        severe_isolation = first_gap > outlier_gap_seconds * 2.0
+        low_confidence_outlier = (
+            first.word.probability < outlier_probability_threshold
+            and (
+                first_gap > outlier_gap_seconds
+                or first_duration > 1.2
+            )
+        )
         if (
             first.word_index != second.word_index
-            and first_gap > outlier_gap_seconds
-            and first.word.probability < outlier_probability_threshold
+            and (severe_isolation or low_confidence_outlier)
         ):
             repaired_end = max(0.0, second.word.start_seconds - 0.04)
             repaired_start = max(0.0, repaired_end - typical_duration)
@@ -283,7 +318,11 @@ def _resolved_token_timings(
             repairs.append(
                 {
                     "token_index": first_index,
-                    "operation": "replace_low_confidence_leading_outlier",
+                    "operation": (
+                        "replace_low_confidence_leading_outlier"
+                        if low_confidence_outlier
+                        else "replace_isolated_leading_outlier"
+                    ),
                     "original_start_seconds": round(first.word.start_seconds, 3),
                     "original_end_seconds": round(first.word.end_seconds, 3),
                     "resolved_start_seconds": round(repaired_start, 3),
@@ -329,6 +368,13 @@ def align_authoritative_cues(
 ) -> dict[str, dict[str, Any]]:
     """Align exact cue text monotonically to measured final-audio words."""
 
+    try:
+        validate_arabic_dialogue(
+            " ".join(word.text for word in words),
+            context="subtitle observed-word evidence",
+        )
+    except ProjectDomainError as exc:
+        raise SubtitleBuildError(str(exc)) from exc
     observed = _observed_tokens(words)
     if not observed:
         raise SubtitleBuildError("Subtitle alignment produced no normalized tokens.")
@@ -338,7 +384,14 @@ def align_authoritative_cues(
         cue_id = cue["cue_id"]
         if cue_id in result:
             raise SubtitleBuildError(f"Duplicate subtitle cue ID: {cue_id}")
-        expected = _tokens(cue["exact_text"])
+        try:
+            exact_text = validate_arabic_dialogue(
+                cue["exact_text"],
+                context=f"subtitle cue {cue_id}",
+            )
+        except ProjectDomainError as exc:
+            raise SubtitleBuildError(str(exc)) from exc
+        expected = _tokens(exact_text)
         if not expected:
             raise SubtitleBuildError(f"Subtitle cue has no alignable text: {cue_id}")
         window_start = cue.get("window_start_seconds")
@@ -388,6 +441,56 @@ def align_authoritative_cues(
             outlier_gap_seconds=outlier_gap_seconds,
             outlier_probability_threshold=outlier_probability_threshold,
         )
+        if window_start is not None:
+            matched_positions = [
+                index for index, match in enumerate(matches) if match is not None
+            ]
+            if len(matched_positions) >= 2:
+                first_index, second_index = matched_positions[:2]
+                first = matches[first_index]
+                second = matches[second_index]
+                assert first is not None and second is not None
+                owner_start = float(window_start)
+                resolved_first = token_timings[first_index]
+                resolved_start = resolved_first["start_seconds"]
+                resolved_end = resolved_first["end_seconds"]
+                if (
+                    resolved_start is not None
+                    and resolved_end is not None
+                    and float(resolved_start) < owner_start
+                    and float(resolved_end) >= owner_start - 0.05
+                    and second.word.start_seconds >= owner_start - 0.05
+                    and first.word.probability
+                    < outlier_probability_threshold
+                ):
+                    clipped_end = max(
+                        owner_start + 0.001,
+                        min(
+                            float(resolved_end),
+                            second.word.start_seconds,
+                        ),
+                    )
+                    resolved_first["start_seconds"] = owner_start
+                    resolved_first["end_seconds"] = clipped_end
+                    repairs.append(
+                        {
+                            "token_index": first_index,
+                            "operation": (
+                                "clip_low_confidence_leading_anchor_to_"
+                                "owner_window"
+                            ),
+                            "original_start_seconds": round(
+                                float(resolved_start),
+                                3,
+                            ),
+                            "original_end_seconds": round(
+                                float(resolved_end),
+                                3,
+                            ),
+                            "resolved_start_seconds": round(owner_start, 3),
+                            "resolved_end_seconds": round(clipped_end, 3),
+                        }
+                    )
         timed = [
             token
             for token in token_timings

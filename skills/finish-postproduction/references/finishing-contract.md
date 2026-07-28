@@ -33,11 +33,15 @@ Generated Segment files remain read-only. A picture or audio trim is legal only
 when the model declares the exact interval and the validator proves that every
 Storyboard dialogue window remains intact.
 
-## Native sound
+## ElevenLabs-dubbed sound
 
-Each accepted clip keeps its synchronized Seedance-native dialogue, storytelling,
-breath, reaction, ambience, effects, and restrained music. The edit preserves the
-same established character voice across on-camera and off-camera storytelling.
+Each accepted clip keeps its synchronized exact Arabic ElevenLabs dialogue,
+Seedance-native effects, and the validated mix of Seedance non-dialogue original
+audio outside dialogue intervals plus digital silence inside the dialogue cuts.
+ElevenLabs generates
+dialogue only; Seedance character speech and music remain forbidden.
+The edit preserves the same established character voice across on-camera and
+off-camera storytelling.
 Every source window, timeline offset, gain, fade, and terminal fade is explicit in
 the model plan. The renderer never pads silence, invents a de-click duration, or
 adds a terminal fade.
@@ -45,7 +49,7 @@ adds a terminal fade.
 ## Subtitle chain
 
 ```text
-Storyboard exact line + final clean master native audio
+Storyboard exact line + final clean master ElevenLabs-dubbed audio
 -> measured word-timestamp alignment
 -> picture/audio EDL ownership validation
 -> subtitle-cues.json + SRT + VTT
@@ -58,7 +62,12 @@ alignment record includes the clean-master path and content hash. Missing audio,
 an unavailable model, low-confidence coverage, or a cue outside its owning
 Segment blocks delivery; there is no fallback to nominal Storyboard speech
 windows or source-window timing overrides. Display-time adjustments remain
-inside the owning Segment and never change native audio.
+inside the owning Segment and never change dubbed audio.
+
+Burned-in Arabic captions use the repository-bundled, SHA-256-pinned Noto Sans
+Arabic variable font through Pillow RAQM. No system-font discovery or fallback is
+allowed. The declared Pillow package, RAQM/FriBiDi shaping support, the bundled
+font, and its expected hash must all pass before rendering.
 
 ## Delivery
 

@@ -52,6 +52,7 @@ Target Language
 Aspect Ratio
 Resolution
 Speech Audio Source
+Sound Effects Audio Source
 Story Premise
 Fable Meaning
 Framing and Embedded Story Strategy
@@ -61,12 +62,14 @@ Opening Event
 Ending Event and Obligation
 ```
 
-`Production Type` is `ai_narrated_fable_drama`; `Aspect Ratio` is `16:9`; and
-`Speech Audio Source` is `seedance_native`. `Visual Style` uses the latest
+`Production Type` is `ai_narrated_fable_drama`; `Aspect Ratio` is `16:9`;
+`Target Language` is exactly `Arabic`; and `Speech Audio Source` is
+`elevenlabs_dubbed`. `Sound Effects Audio Source` is exactly
+`seedance_native`. ElevenLabs generates Arabic dialogue only. `Visual Style` uses the latest
 conversation choice, or `3D Healing Animation` by default. `Resolution` uses the
 latest conversation choice from `480p`, `720p`, `1080p`, or `4k`, defaulting to
 `1080p`.
-`Target Country` and `Target Language` are concrete authored values.
+`Target Country` is a concrete authored value.
 Opening and ending rows describe authored screen events, not promotional slogans.
 
 ## Characters
@@ -270,7 +273,7 @@ Every Scene Unit contains at least one non-`none` audio cell.
 Use `none` or exactly:
 
 ```text
-L-001; speaker=<entity-id>; mode=<delivery-mode>; gate=<visible or audible trigger inside this shot>; transition=<breath, reaction, J-cut, L-cut, action result, or silence handoff>; delivery=<playable cue or none>; text="<exact target-language words>"
+L-001; speaker=<entity-id>; mode=<delivery-mode>; gate=<visible or audible trigger inside this shot>; transition=<breath, reaction, J-cut, L-cut, action result, or silence handoff>; delivery=<playable cue or none>; text="<exact Arabic words>"
 ```
 
 Valid delivery modes are:
@@ -281,14 +284,17 @@ external_voiceover | embedded_character_dialogue
 ```
 
 Each shot holds at most one Line. Every line must pass the shared strict
-speech-rate gate in its owning Shot: at most 4.0 CJK characters per second and at
-most 2.6 non-CJK words per second, plus 0.25 seconds of line start/end allowance.
+Arabic-only speech-rate gate in its owning Shot: the text must contain Arabic
+script, contain no Latin letters, and use at most 2.6 Arabic words per second,
+plus 0.25 seconds of line start/end allowance.
 A fast line blocks screenplay release; shorten it or give the Shot more time.
 The `gate` states why speech begins. The
 `transition` states how the current voice enters naturally from the prior voice,
 silence, or narrative layer. The speaker must be a Performer for on-camera speech
 or have an off-screen/voice-over staging declaration. Its addressee comes from the
 same row's `Gaze / Addressee` cell. Dialogue is exact production authority.
+Every dialogue value must contain Arabic script and no Latin letters. Arabic
+digits, punctuation, and diacritics are allowed.
 
 An on-camera mode requires `Presence=on_screen`. An off-camera storytelling mode
 requires `Presence=off_screen` or `voice_over`. Only a `storyteller` or `both`

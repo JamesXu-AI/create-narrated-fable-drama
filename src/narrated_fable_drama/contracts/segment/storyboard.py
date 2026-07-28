@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 from narrated_fable_drama.contracts.segment.common import (
     ALLOWED_DELIVERY_MODES,
     ALLOWED_OPERATIONS,
     ALLOWED_PROVIDER_ROLES,
+    ARABIC_ENGINEERED_SECTION_LABELS,
+    ARABIC_LETTER_RE,
+    ARABIC_OPERATION_BY_ENUM,
+    ARABIC_QUALITY_FALLBACK_DIRECTIVE,
+    ARABIC_SEEDANCE_DIALOGUE_REPLACEMENT_DIRECTIVE,
+    ARABIC_SHOT_AUTHORITY_LABELS,
+    ARABIC_SHOT_ELEMENT_LABELS,
+    ARABIC_VISUAL_STYLE_BY_NAME,
     CHARACTER_STATE_HEADERS,
     DIALOGUE_CELL_RE,
     GENERATION_PLAN_HEADERS,
@@ -27,6 +35,10 @@ from narrated_fable_drama.contracts.storyboard import (
     table_after_heading,
 )
 from narrated_fable_drama.core.project_context import load_project_context
+from narrated_fable_drama.core.project_domain import (
+    ProjectDomainError,
+    validate_arabic_dialogue,
+)
 from narrated_fable_drama.core.speech_rate import (
     SpeechRateError,
     require_speech_rate,
@@ -35,6 +47,21 @@ from narrated_fable_drama.core.speech_rate import (
 TIGHT_SHOT_SIZES = {"extreme_close_up", "close_up", "medium_close_up"}
 WIDE_EXCEPTION_SHOT_SIZES = {"medium_wide", "wide", "extreme_wide"}
 POSITION_CHANGE_EXCEPTION_PREFIX = "position-change exception:"
+
+
+def _provider_visual_style_ar(visual_style: str) -> str:
+    mapped = ARABIC_VISUAL_STYLE_BY_NAME.get(visual_style)
+    if mapped:
+        return mapped
+    if ARABIC_LETTER_RE.search(visual_style) and not re.search(
+        r"[A-Za-z]",
+        visual_style,
+    ):
+        return visual_style
+    raise SegmentRuntimeError(
+        "Arabic Seedance Prompts require an approved Arabic provider rendering "
+        f"for Visual Style {visual_style!r}"
+    )
 
 
 def _field_table(section: str, heading: str) -> dict[str, str]:
@@ -100,6 +127,10 @@ def _reference_bindings(
             or not all((namespace, subject, purpose, scope, forbidden))
         ):
             raise SegmentRuntimeError(f"{segment_id} has an invalid Reference Plan row")
+        if role == "reference_audio":
+            raise SegmentRuntimeError(
+                f"{segment_id} Reference Plan must not send audio to guide-only Seedance"
+            )
         seen_tokens.add(token)
         result.append(
             {
@@ -116,7 +147,8 @@ def _reference_bindings(
                 ),
                 "forbidden_inheritance_en": forbidden,
                 "prompt_declaration_en": (
-                    f"{token} is {subject}; use it only for {purpose}; "
+                    f"{token} ({subject}) is the approved reference; use it only "
+                    f"for {purpose}; "
                     f"do not inherit {forbidden}."
                 ),
             }
@@ -184,7 +216,7 @@ def _dialogue_cues(
         match = DIALOGUE_CELL_RE.search(cell)
         if match is None:
             raise SegmentRuntimeError(
-                f"{segment_id} Shot {shot_index} Dialogue and Native Audio must use "
+                f"{segment_id} Shot {shot_index} Dialogue and Dubbing Audio must use "
                 "the exact Line/window/speaker/mode/transition/text syntax"
             )
         line_id, start, end, speaker, mode, transition_id, exact_text = match.groups()
@@ -205,13 +237,14 @@ def _dialogue_cues(
         if start_seconds < 0 or end_seconds <= start_seconds or end_seconds > duration:
             raise SegmentRuntimeError(f"{line_id} has an invalid Storyboard speech window")
         try:
+            validate_arabic_dialogue(exact_text, context=line_id)
             speech_rate = require_speech_rate(
                 line_id=line_id,
                 text=exact_text,
                 window_seconds=end_seconds - start_seconds,
                 stage=f"segment-prompt gate {segment_id}/Shot {shot_index}",
             )
-        except SpeechRateError as exc:
+        except (ProjectDomainError, SpeechRateError) as exc:
             raise SegmentRuntimeError(str(exc)) from exc
         result.append(
             {
@@ -382,27 +415,57 @@ def storyboard_segment_rows(
                 for item in bindings
                 if item["provider_role"] == "reference_image"
             ][:1]
+        visual_style_ar = _provider_visual_style_ar(
+            str(project_context["visual_style"])
+        )
         prompt_contract = {
-            "language": "English directions with exact target-language speech",
-            "operation_instruction_en": operation,
-            "global_constraints_en": (
-                f"16:9; visual style exactly {project_context['visual_style']}; "
-                "fewest story-active visible characters; preserve the declared "
-                "eyeline axis and screen directions; close-up-led coverage with "
-                "wider framing only for a labeled position-change exception; "
-                "preserve exact speakers, voice identity, mouth behavior, "
-                "natural speech transitions, references, continuity, and native audio; "
-                "no generated subtitles or on-screen text."
+            "authoring_ruleset": (
+                "skills/virtual-production/references/"
+                "seedance-2-prompt-authoring-contract.md"
             ),
-            "visible_character_economy_en": direction.get(
+            "language": "Arabic production directions and exact Arabic speech",
+            "model_prompt_language": "Arabic",
+            "language_code": "ar",
+            "latin_text_policy": (
+                "forbidden_except_provider_reference_tokens"
+            ),
+            "operation_instruction_ar": ARABIC_OPERATION_BY_ENUM[operation],
+            "visual_style_instruction_ar": visual_style_ar,
+            "authoring_sequence": [
+                "resolve authored operation and dynamics",
+                "map atomic provider references",
+                "confirm eight Storyboard-authorized core elements",
+                "write engineered three-part Prompt",
+                "run independent final Prompt audit",
+            ],
+            "missing_or_conflicting_information_policy": (
+                "return_to_owning_upstream_department_without_silent_modification"
+            ),
+            "composite_reference_policy": (
+                "split_and_approve_atomic_images_upstream"
+            ),
+            "global_constraints_ar": (
+                f"نسبة العرض إلى الارتفاع ١٦:٩؛ الأسلوب البصري هو {visual_style_ar}؛ "
+                "أقل عدد ممكن من الشخصيات الفاعلة ظاهرًا؛ الحفاظ على محور "
+                "النظرات واتجاهات الشاشة؛ تغطية تقودها اللقطات القريبة ولا "
+                "تتسع إلا لاستثناء معلّم لتغيير الموضع؛ الحفاظ على المتحدث "
+                "الدقيق وهوية الشخصية وحركة الفم وانتقالات الكلام والمراجع "
+                "والاستمرارية؛ تنطق الشخصية المرئية الحوار العربي الدقيق "
+                "مرة واحدة بصوت مؤقت لتوجيه حركة الفم؛ ينشئ سيدانس أجواء "
+                "وحركة أصلية، ثم يُحذف كل صوت شخصيات ويُستبدل فورًا بصوت "
+                "إليفن لابز الدقيق؛ من دون "
+                "موسيقى أو ترجمات مولدة أو نص ظاهر على الشاشة."
+            ),
+            "visible_character_economy_source_en": direction.get(
                 "Visible Character Economy", ""
             ),
-            "eyeline_axis_and_screen_direction_en": direction.get(
+            "eyeline_axis_and_screen_direction_source_en": direction.get(
                 "Eyeline Axis and Screen Direction", ""
             ),
-            "shot_size_policy": (
-                "ECU/CU/MCU dominate; MWS/WS/EWS only for the shortest labeled "
-                "position-change exception followed by a tight Shot."
+            "shot_size_policy_ar": (
+                "تسود اللقطات شديدة القرب والقريبة والمتوسطة القريبة؛ ولا "
+                "تُستخدم اللقطات الأوسع إلا لأقصر استثناء معلّم لتغيير "
+                "الموضع، ثم تعود التغطية مباشرة إلى لقطة ضيقة."
             ),
             "reference_priority_order": [
                 item["provider_token"]
@@ -410,12 +473,41 @@ def storyboard_segment_rows(
             ],
             "dialogue_delimiter": "{}",
             "music_delimiter": "()",
-            "sound_effect_delimiter": "<>",
             "subtitle_delimiter": "【】",
-            "background_music_policy": "parentheses_only",
+            "background_music_policy": "forbidden",
+            "seedance_audio_directive": (
+                ARABIC_SEEDANCE_DIALOGUE_REPLACEMENT_DIRECTIVE
+            ),
+            "dubbing_source": (
+                "Seedance native ambience and action sound, with speech-free "
+                "Seedance native audio repairing dialogue cuts, plus exact "
+                "ElevenLabs Arabic dialogue embedded immediately after this "
+                "Segment is generated"
+            ),
             "generated_subtitle_policy": "forbidden",
             "avoid_precise_time_ranges": True,
             "single_dominant_camera_move_per_shot": True,
+            "engineered_prompt_sections": [
+                ARABIC_ENGINEERED_SECTION_LABELS[0],
+                "اللقطة N: <حجم اللقطة العربي المطابق للوحة القصة>.",
+                ARABIC_ENGINEERED_SECTION_LABELS[1],
+            ],
+            "eight_core_elements": [
+                "precise subject",
+                "action details",
+                "setting and environment",
+                "lighting and tone",
+                "dominant camera behavior",
+                "approved visual style",
+                "image quality",
+                "constraints and anti-distortion fallback",
+            ],
+            "reference_noun_after_every_token": True,
+            "shot_element_labels": list(ARABIC_SHOT_ELEMENT_LABELS),
+            "shot_authority_labels": list(ARABIC_SHOT_AUTHORITY_LABELS),
+            "quality_and_fallback_directive": (
+                ARABIC_QUALITY_FALLBACK_DIRECTIVE
+            ),
         }
         row = {
             "segment_id": segment_id,
@@ -454,7 +546,7 @@ def storyboard_segment_rows(
                 else "none"
             ),
             "reference_video_audio": (
-                "preserve_predecessor_audio"
+                "strip_predecessor_audio"
                 if operation == "video_extension"
                 else "none"
             ),

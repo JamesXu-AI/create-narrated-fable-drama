@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
-from pathlib import Path
 import re
 import shutil
 import struct
 import tempfile
-from typing import Any
 import wave
-from pathlib import PurePosixPath
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 from narrated_fable_drama.contracts.asset_catalog import (
     ASSET_CATALOG_RELATIVE_PATH,
@@ -26,11 +25,12 @@ from narrated_fable_drama.core.paths import ProjectPaths
 from narrated_fable_drama.core.validation import StoryVideoError
 from narrated_fable_drama.media.ffmpeg import (
     MediaCommandError,
+)
+from narrated_fable_drama.media.ffmpeg import (
     run as run_media_command,
 )
 from narrated_fable_drama.providers import runtime as provider_runtime
 from narrated_fable_drama.providers import seedaudio
-
 
 REPOSITORY_ROOT = ProjectPaths.resolve(Path(__file__)).repository_root
 ASSET_MEDIA_RELATIVE_PATH = Path("workspace/assets")
@@ -40,7 +40,8 @@ VOICE_SAMPLE_RATE_HZ = 48000
 VOICE_CHANNELS = 2
 VOICE_SAMPLE_WIDTH_BYTES = 2
 VOICE_MAX_EDGE_SILENCE_SECONDS = 1.0
-VOICE_MAX_INTERNAL_WORD_GAP_SECONDS = 0.6
+VOICE_MAX_INTERNAL_WORD_GAP_SECONDS = 0.8
+VOICE_MAX_PUNCTUATED_WORD_GAP_SECONDS = 1.5
 VOICE_DURATION_TOLERANCE_SECONDS = 0.02
 VOICE_BRIEF_CONTRACT = "voice-reference-brief/dynamic-duration"
 VOICE_DURATION_POLICY = "natural_duration_from_exact_sample_text"
@@ -105,7 +106,11 @@ def _existing_voice_is_current(
     if not isinstance(words, list) or not words:
         return False
     actual_words = [
-        "".join(character.casefold() for character in word.get("text", "") if character.isalnum())
+        "".join(
+            character.casefold()
+            for character in word.get("text", "")
+            if character.isalnum()
+        )
         for word in words
         if isinstance(word, dict)
     ]
@@ -129,13 +134,16 @@ def _existing_voice_is_current(
             or not isinstance(end, (int, float))
             or start < 0
             or end <= start
-            or end
-            > wav_evidence["duration_seconds"] + VOICE_DURATION_TOLERANCE_SECONDS
+            or end > wav_evidence["duration_seconds"] + VOICE_DURATION_TOLERANCE_SECONDS
             or (index and start < previous_start)
             or (index and end < previous_end)
             or (
                 index
-                and start - previous_end > VOICE_MAX_INTERNAL_WORD_GAP_SECONDS
+                and start - previous_end
+                > _allowed_word_gap_seconds(
+                    expected_brief["sample_text_en"],
+                    index,
+                )
             )
         ):
             return False
@@ -176,6 +184,24 @@ def _expected_words(text: str) -> list[str]:
     ]
 
 
+def _allowed_word_gap_seconds(text: str, word_index: int) -> float:
+    """Allow natural sentence/phrase pauses without tolerating silent dropouts."""
+
+    matches = list(
+        re.finditer(
+            r"[^\W_]+(?:['’][^\W_]+)*",
+            text,
+            flags=re.UNICODE,
+        )
+    )
+    if word_index <= 0 or word_index >= len(matches):
+        return VOICE_MAX_INTERNAL_WORD_GAP_SECONDS
+    separator = text[matches[word_index - 1].end() : matches[word_index].start()]
+    if re.search(r"[,.!?;:،؛؟…]", separator):
+        return VOICE_MAX_PUNCTUATED_WORD_GAP_SECONDS
+    return VOICE_MAX_INTERNAL_WORD_GAP_SECONDS
+
+
 def _subtitle_word_timing(
     subtitle: Any, *, expected_text: str, provider_duration_seconds: float
 ) -> list[dict[str, Any]]:
@@ -184,13 +210,17 @@ def _subtitle_word_timing(
     if provider_duration_seconds <= 0:
         raise VoiceReferenceGenerationError("Seed Audio returned empty audio")
 
-    if not isinstance(subtitle, dict) or not isinstance(subtitle.get("sentences"), list):
+    if not isinstance(subtitle, dict) or not isinstance(
+        subtitle.get("sentences"), list
+    ):
         raise VoiceReferenceGenerationError(
             "Seed Audio returned no word-timing subtitle authority"
         )
     words: list[dict[str, Any]] = []
     for sentence in subtitle["sentences"]:
-        if not isinstance(sentence, dict) or not isinstance(sentence.get("words"), list):
+        if not isinstance(sentence, dict) or not isinstance(
+            sentence.get("words"), list
+        ):
             raise VoiceReferenceGenerationError(
                 "Seed Audio returned invalid word-timing subtitle authority"
             )
@@ -200,9 +230,7 @@ def _subtitle_word_timing(
                     "Seed Audio returned an invalid subtitle word"
                 )
             normalized = "".join(
-                character.casefold()
-                for character in raw["text"]
-                if character.isalnum()
+                character.casefold() for character in raw["text"] if character.isalnum()
             )
             if not normalized:
                 continue
@@ -250,20 +278,19 @@ def _subtitle_word_timing(
             raise VoiceReferenceGenerationError(
                 "Seed Audio returned non-monotonic word timing"
             )
-    gaps = [
-        max(
+    for index in range(1, len(words)):
+        gap = max(
             0.0,
             words[index]["provider_start_seconds"]
             - words[index - 1]["provider_end_seconds"],
         )
-        for index in range(1, len(words))
-    ]
-    max_gap = max(gaps, default=0.0)
-    if max_gap > VOICE_MAX_INTERNAL_WORD_GAP_SECONDS:
-        raise VoiceReferenceGenerationError(
-            "Seed Audio inserted an overlong pause between sample words: "
-            f"{max_gap:.3f}s"
-        )
+        allowed = _allowed_word_gap_seconds(expected_text, index)
+        if gap > allowed:
+            raise VoiceReferenceGenerationError(
+                "Seed Audio inserted an overlong pause between sample words: "
+                f"gap={gap:.3f}s, allowed={allowed:.3f}s, "
+                f"word={words[index]['text']!r}"
+            )
     first_word_start = words[0]["provider_start_seconds"]
     last_word_end = words[-1]["provider_end_seconds"]
     trailing_silence = max(0.0, provider_duration_seconds - last_word_end)
@@ -409,7 +436,10 @@ def _generate_one(
             )
             staged_target = Path(temporary_dir) / "final" / "voice.wav"
             final_duration = _normalize_to_contract(source, staged_target)
-            if abs(final_duration - provider_duration) > VOICE_DURATION_TOLERANCE_SECONDS:
+            if (
+                abs(final_duration - provider_duration)
+                > VOICE_DURATION_TOLERANCE_SECONDS
+            ):
                 raise VoiceReferenceGenerationError(
                     "Technical PCM conversion changed the authored duration: "
                     f"provider={provider_duration:.6f}s, final={final_duration:.6f}s"
@@ -493,9 +523,7 @@ def ensure_voice_references(
     }
 
 
-def _catalog_reference_file(
-    repository_root: Path, raw_path: Any, label: str
-) -> Path:
+def _catalog_reference_file(repository_root: Path, raw_path: Any, label: str) -> Path:
     if not isinstance(raw_path, str) or not raw_path:
         raise VoiceAuthorityError(f"{label} is missing from the asset catalog.")
     portable = PurePosixPath(raw_path)
@@ -596,7 +624,7 @@ def _validate_dynamic_timing(
     actual_words: list[str] = []
     previous_end = 0.0
     previous_start = 0.0
-    max_gap = 0.0
+    gap_violation = False
     first_start = 0.0
     last_end = 0.0
     for index, word in enumerate(words):
@@ -625,7 +653,9 @@ def _validate_dynamic_timing(
                 f"character {asset_id} has word timing outside its voice WAV"
             )
         if index:
-            max_gap = max(max_gap, float(start) - previous_end)
+            gap = float(start) - previous_end
+            if gap > _allowed_word_gap_seconds(sample_text, index):
+                gap_violation = True
         else:
             first_start = float(start)
         previous_end = float(end)
@@ -645,7 +675,7 @@ def _validate_dynamic_timing(
     if (
         first_start > VOICE_MAX_EDGE_SILENCE_SECONDS
         or audio_duration - last_end > VOICE_MAX_EDGE_SILENCE_SECONDS
-        or max_gap > VOICE_MAX_INTERNAL_WORD_GAP_SECONDS
+        or gap_violation
     ):
         raise VoiceAuthorityError(
             f"character {asset_id} has an anomalous sample-text pause"
@@ -691,8 +721,7 @@ def validate_voice_authority(
             or brief.get("entity_id") != asset_id
             or not isinstance(brief.get("sample_text_en"), str)
             or not brief["sample_text_en"].strip()
-            or brief.get("output", {}).get("duration_policy")
-            != VOICE_DURATION_POLICY
+            or brief.get("output", {}).get("duration_policy") != VOICE_DURATION_POLICY
             or "duration_seconds" in brief.get("output", {})
             or not isinstance(brief.get("evidence"), dict)
             or brief["evidence"].get("uri") != reference.get("uri")
@@ -718,9 +747,7 @@ def validate_voice_authority(
 
     return {
         "result": "PASS",
-        "catalog_path": str(
-            (repository_root / ASSET_CATALOG_RELATIVE_PATH).resolve()
-        ),
+        "catalog_path": str((repository_root / ASSET_CATALOG_RELATIVE_PATH).resolve()),
         "speaker_count": len(validated),
         "remote_service_calls": 0,
         "speakers": validated,

@@ -20,8 +20,8 @@ When reporting progress, use one compact pattern:
 请确认：
 ```
 
-Before all first-pass Segment Prompts exist and the full Prompt/speech-rate gate
-passes, pause only when:
+Before all first-pass Segment Prompts exist, the full Prompt/speech-rate gate
+passes, and the independent Prompt audit records are current, pause only when:
 
 1. target country is missing;
 2. a material creative choice cannot safely be inferred; or
@@ -38,8 +38,8 @@ file, or department handoff.
 The declared production sequence is executable authority, not a user preference
 that must be reconfirmed. When a requested downstream result is missing an upstream
 artifact, create and validate the missing non-media prerequisites in sequence.
-Never bypass screenplay, production-design, Storyboard, Prompt-materialization, or
-their release gates.
+Never bypass screenplay, production-design, Storyboard, Prompt-materialization,
+virtual-production's separate internal Prompt audit, or their release gates.
 
 Keep the task isolated to the current repository, its explicit `TASK_DIR`, and the
 current repository's `assets/`. Never search another project, prior project copy,
@@ -99,6 +99,10 @@ execution plan in memory, keeps one mutable submission record only while a provi
 attempt is active, and reduces a successful Segment to `video.mp4`,
 `last-frame.png`, and `production-record.json`. Do not create request/response/poll
 sidecars, copied Prompts, artifacts manifests, generation state, or summary files.
+The deterministic
+`.pending/virtual-production/prompt-audits/segment-NNN.json` PASS record is the
+single exception needed to prove that the exact Prompt passed the independent
+internal gate; it is technical state, not human approval or creative authority.
 
 Pause. One confirmation authorizes exactly one attempt for one not-yet-generated
 Segment. It does not authorize a later Segment or a retry. “继续到结束” also does
@@ -110,8 +114,30 @@ not a persisted approval record.
 
 ## After every video attempt
 
-Inspect the complete video with sound, run the applicable technical and
-audiovisual review, then report:
+After the Seedance provider result succeeds, publish its immutable source and last
+frame as `PICTURE_GENERATED` and immediately start two separate tracks:
+
+1. **Picture track.** Directly review the exact provider attempt for story action,
+   identity, composition, continuity, eyeline axis, close-up dominance, required
+   position changes, last-frame usability, and the incoming/outgoing visual seam.
+   A picture review returning `NO_ISSUES` releases this exact attempt as
+   predecessor evidence. It does not accept the Segment or authorize another
+   provider call by itself. A successor still requires its own fresh conversational
+   confirmation and exact `--observed-predecessor` acknowledgement, but it does not
+   wait for the predecessor's dubbing to finish.
+2. **Audio track.** Immediately run virtual-production's internal ElevenLabs
+   Segment-audio stage. Require Seedance native audio, remove the union of detected
+   character speech and complete Storyboard dialogue windows, hard-mute the
+   complete mixed Seedance track in those intervals, preserve Seedance-native
+   ambience and action sound unchanged outside them, and align exact ElevenLabs
+   Arabic natural phrases to the detected Seedance mouth-performance window.
+   ElevenLabs generates Arabic dialogue only. It may not generate ambience,
+   action sound, Foley, animal sounds, music, room tone, or other non-dialogue
+   audio. Record any deviation from Storyboard timing for review. Do not defer or
+   batch this operation.
+
+After the audio and voice-identity gates pass, inspect the complete dubbed video
+with sound, run the applicable technical and audiovisual review, then report:
 
 ```text
 生成后
@@ -123,14 +149,18 @@ audiovisual review, then report:
 请确认下一步：
 ```
 
-For every Segment containing speech, the post-attempt review must first compare
-each generated speaker against the approved character voice reference. Report and
+For every Segment containing speech, the audiovisual review must compare
+each ElevenLabs-dubbed speaker against the approved character voice reference. Report and
 block on timbre/register/age/texture/accent drift, forbidden squeak or helium
 effects, missing reference media, unreadable speech evidence, or a failed
 voice-identity gate. Technical PASS never replaces listening at normal speed.
 
-Pause even when review returns `NO_ISSUES`. Do not generate the successor, retry,
-or enter final assembly until the human chooses the next action.
+Pause for the current Segment's acceptance decision even when its complete
+audiovisual review returns `NO_ISSUES`. Audio failure, missing voice evidence, or
+rejected dubbing blocks current-Segment acceptance and final assembly, but does
+not invalidate an already reviewed picture or stop an already authorized
+successor Seedance job. Picture failure does block use of that attempt as
+successor evidence and requires a freshly confirmed retry.
 
 ## No automatic retry
 
@@ -148,7 +178,8 @@ user-facing approval JSON, confirmation receipts, hash ledgers, review reports,
 compatibility packets, visual-spec companions, location-continuity copies, or
 extra checkpoints.
 
-For a pending Segment, one exact Prompt is sufficient; Storyboard remains its plan.
+For a pending Segment, retain one exact Prompt and its current deterministic Prompt
+audit record; Storyboard remains its plan.
 For a successful image, keep the final image and its one reuse brief; do not keep
 duplicate Prompt/request/response sidecars. Provider polling and diagnostic files
 may remain only for an active or failed attempt when they are needed to resume or

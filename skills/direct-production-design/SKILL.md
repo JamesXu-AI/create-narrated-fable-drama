@@ -30,7 +30,14 @@ Production design owns reusable appearance and voice identity:
 
 - one standalone character identity for every `Kind=individual` entity and one
   voice reference only for each speaking individual;
+- for an Arabic ElevenLabs project, one separately designed Saudi-Arabic
+  ElevenLabs Voice ID per speaking individual, the exact role-to-Voice-ID map,
+  and one Arabic reference WAV with exact provider timing per role;
 - ensemble, costume, appearance-state, prop, and Location assets;
+- reusable sound-material direction for environments, footsteps, impacts,
+  clothing, wings, and other recurring effects; exact per-Shot timing remains
+  Storyboard authority and Segment-specific generation remains virtual
+  production responsibility;
 - physical topology, face, scale, materials, wardrobe, set dressing, geography,
   population, time, light, weather, and atmosphere; and
 - the asset catalog used to resolve provider media.
@@ -61,6 +68,38 @@ off-camera storytelling, and the return to the framing scene.
 
 An off-camera storyteller may need a voice reference without a positive image
 reference in an embedded-story Segment. Asset creation must support that separation.
+
+## Arabic ElevenLabs voice identity gate
+
+For `target_language=Arabic` and
+`speech_audio_source=elevenlabs_dubbed`, voice identity is an asset-department
+creation responsibility, not a virtual-production responsibility. Before any
+Segment is generated or dubbed:
+
+- author every speaking character's voice direction for one consistent neutral
+  urban Riyadh Saudi accent in Saudi-accented MSA, explicitly excluding
+  Egyptian, Levantine, Emirati, Kuwaiti, other Gulf, newsreader, and recitation
+  drift; lock a 100..1000-character Arabic sample without Latin dialogue;
+- use ElevenLabs Voice Design separately for every character; never map two
+  characters to the same Voice ID;
+- synthesize and register one Arabic reference WAV for each selected Voice ID
+  with `eleven_multilingual_v2`, stable low-style voice settings, and the
+  project pronunciation compiler; preserve exact provider timing and the
+  repository PCM contract;
+- keep authored `exact_text` unvocalized and immutable, derive a separate
+  pronunciation-only `tts_text` with conservative tashkeel for masculine
+  grammatical forms and names, and reject any derivation that changes letters,
+  punctuation, spacing, or word order;
+- persist the technical mapping at
+  `TASK_DIR/direct-production-design/elevenlabs-voice-map.json`; and
+- pass the distinct-ID gate in `validate_production_design.py`.
+
+Downstream Segment dubbing may consume this map with
+`ELEVENLABS_VOICE_MAP=@TASK_DIR/direct-production-design/elevenlabs-voice-map.json`.
+It may not design, substitute, merge, or silently reuse character voices.
+`language_code=ar` metadata is not treated as proof of accent and is not sent to
+Multilingual v2; the selected Saudi voice plus the authored accent Prompt are
+the accent authority.
 
 ## Visual plan
 
@@ -120,6 +159,8 @@ python3 skills/direct-production-design/scripts/build_initial_production_design.
   [--codex-reuse-asset TARGET_ASSET_ID=SOURCE_ASSET_ID ...] \
   [--codex-regenerate-visual-asset TARGET_ASSET_ID ...] \
   [--codex-accept-generated-visual-asset ASSET_ID=SOURCE_URI ...]
+python3 skills/direct-production-design/scripts/generate_elevenlabs_role_voices.py \
+  --task-dir TASK_DIR
 python3 skills/direct-production-design/scripts/validate_production_design.py \
   --task-dir TASK_DIR
 ```

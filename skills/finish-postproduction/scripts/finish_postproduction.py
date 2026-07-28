@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the complete current picture, native-sound, subtitle, and delivery finish."""
+"""Run the complete picture, Arabic dubbing, subtitle, and delivery finish."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import shutil
 
 from narrated_fable_drama.core.json_io import load_json_object
 from narrated_fable_drama.core.project_context import load_project_context
+from narrated_fable_drama.core.project_domain import SPEECH_AUDIO_SOURCE
 from subtitles.subtitle_delivery import build
 from subtitles.subtitle_style import DEFAULT_STYLE
 
@@ -24,17 +25,19 @@ class FinishError(RuntimeError):
 
 def _load_project(task_dir: Path) -> dict[str, object]:
     payload = load_project_context(task_dir)
-    if payload.get("speech_audio_source") != "seedance_native":
-        raise FinishError("screenplay.md Speech Audio Source must be seedance_native")
+    if payload.get("speech_audio_source") != SPEECH_AUDIO_SOURCE:
+        raise FinishError(
+            f"screenplay.md Speech Audio Source must be {SPEECH_AUDIO_SOURCE}"
+        )
     return payload
 
 
 def _promote_clean_master(task_dir: Path, picture_lock: Path) -> Path:
     if not picture_lock.is_file() or picture_lock.stat().st_size <= 0:
-        raise FinishError("Native picture lock is missing")
+        raise FinishError("Dubbed picture lock is missing")
     probe = probe_media(picture_lock)
     if not probe.has_audio:
-        raise FinishError("Native picture lock lacks Seedance native audio")
+        raise FinishError("Picture lock lacks ElevenLabs dubbed audio")
     delivery_root = task_dir / "finish-postproduction"
     delivery_root.mkdir(parents=True, exist_ok=True)
     clean = delivery_root / "final-clean-master.mp4"
@@ -82,12 +85,22 @@ def finish(
     if not isinstance(audio_sources, dict):
         raise FinishError("Final delivery manifest lacks audio source declarations")
     if (
-        audio_sources.get("seedance_background_music") is not True
-        or audio_sources.get("background_music_source") != "seedance_native"
-    ):
-        raise FinishError(
-            "Main final delivery must preserve Seedance-native background music"
+        audio_sources.get("voice_audio_source") != "elevenlabs_voice_id"
+        or audio_sources.get("dialogue_source") != "elevenlabs"
+        or audio_sources.get("seedance_speech_in_delivery") is not False
+        or audio_sources.get("seedance_generate_audio") is not True
+        or audio_sources.get("seedance_audio_in_delivery") is not True
+        or audio_sources.get("seedance_audio_use")
+        != (
+            "non_dialogue_original_audio_after_character_"
+            "speech_replacement"
         )
+        or audio_sources.get("native_background_audio_source")
+        != (
+            "seedance_original_nondialogue_and_native_gap_fill"
+        )
+    ):
+        raise FinishError("Main final delivery must preserve ElevenLabs Arabic dubbing")
     boundary_qc = delivery_manifest.get("boundary_qc")
     if (
         not isinstance(boundary_qc, dict)
@@ -106,13 +119,17 @@ def finish(
         "srt": str((delivery_root / "subtitles" / "master.srt").resolve()),
         "vtt": str((delivery_root / "subtitles" / "master.vtt").resolve()),
         "manifest": str(manifest_path.resolve()),
-        "voice_audio_source": "speaker_reference_audio",
-        "dialogue_source": "seedance",
+        "voice_audio_source": "elevenlabs_voice_id",
+        "dialogue_source": "elevenlabs",
         "native_background_audio_source": audio_sources.get(
             "native_background_audio_source"
         ),
-        "seedance_background_music": audio_sources.get(
-            "seedance_background_music"
+        "seedance_generate_audio": audio_sources.get("seedance_generate_audio"),
+        "seedance_audio_in_delivery": audio_sources.get(
+            "seedance_audio_in_delivery"
+        ),
+        "seedance_speech_in_delivery": audio_sources.get(
+            "seedance_speech_in_delivery"
         ),
         "background_music_source": audio_sources.get("background_music_source"),
         "boundary_qc_manifest": boundary_qc.get("manifest"),

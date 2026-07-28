@@ -1,6 +1,6 @@
 ---
 name: video-review
-description: Independently review AI narrated drama and fable artifacts or completed Seedance clips for story causality, exact speech, natural dialogue/narration handoffs, character and world continuity, picture, and native sound. Return NO_ISSUES or concise owner-routed corrections; create no approval artifacts.
+description: Independently review either picture-ready Seedance attempts or completed Arabic-dubbed clips, keeping picture release separate from audio acceptance while checking story causality, continuity, speech, mouth sync, ambience, action effects, and sound.
 ---
 
 # Video Review
@@ -33,15 +33,36 @@ For scripts and Storyboards, check:
 - ECU/CU/MCU dominate, and every MWS/WS/EWS is a labeled, shortest-readable
   position-change exception followed by a tight Shot.
 
-For generated video, watch the full clip at normal speed with sound. Check:
+For a `PICTURE_GENERATED` attempt, review the complete immutable
+`seedance-source.mp4` and its exact last frame before it may release a serial
+successor. Check story action, identity, composition, continuity, eyeline axis,
+close-up dominance, every required position change, picture defects, internal
+cuts, last-frame usability, and the incoming/outgoing visual seam. Seedance native
+audio and disposable guide speech are not audio-acceptance evidence at this
+stage. Picture `NO_ISSUES` releases only the exact provider attempt as predecessor
+evidence; it does not accept the Segment or replace the successor's fresh human
+confirmation.
 
-- the correct visible or off-camera speaker says every exact line once;
+For a completed `GENERATED` video, watch the full clip at normal speed with sound.
+Check:
+
+- the ElevenLabs track gives every exact Arabic line once to the correct visible
+  or off-camera speaker;
 - before returning `NO_ISSUES`, compare every speaking character with that
   character's approved voice reference and with the same character's nearest
   generated speech; check timbre, register, age, texture, accent, pace, energy,
   and forbidden effects such as squeak, helium pitch, buzzing distortion, or
   generic narrator replacement;
-- only the intended speaker's mouth moves and lip sync is natural;
+- only the intended speaker's mouth moves and the measured Seedance mouth
+  performance aligns naturally with the ElevenLabs cue;
+- ambience and every Storyboard-authored action effect remain audible; in
+  dialogue-replacement mode, Seedance is the sole source of ambience, action
+  sound, Foley, animal sounds, and other permitted non-dialogue audio; its
+  non-dialogue sound remains unchanged outside the recorded cuts and no generated
+  character voice may survive;
+- ElevenLabs supplies exact Arabic character dialogue only and never ambience,
+  action sound, Foley, animal sounds, music, room tone, or any other non-dialogue
+  audio;
 - an on-screen character remains the same recognizable voice when becoming an
   off-screen storyteller;
 - the switch into or out of embedded-character dialogue feels motivated rather
@@ -51,8 +72,8 @@ For generated video, watch the full clip at normal speed with sound. Check:
   silhouette, reflection, or extra character appears;
 - identity, costume/state, props, geography, light, color, action phase, and
   ambience remain continuous where the story requires;
-- camera, action, internal cuts, effects, native music, safe ending, and external
-  seam are usable;
+- camera, action, internal cuts, safe ending, dubbed audio, and external seam are
+  usable;
 - the frame is not crowded with unnecessary characters; cropped but present roles
   remain spatially credible without forcing a full-cast master;
 - speaker/listener gaze, screen-left/right assignment, reverse angle, and camera
@@ -66,8 +87,15 @@ For generated video, watch the full clip at normal speed with sound. Check:
 
 Run the repository voice-identity evidence gate for every completed Segment that
 contains speech. A technical `FAIL`, missing voice reference, unreadable audio, or
-unmeasurable speech blocks Segment acceptance and successor generation. A
+unmeasurable speech blocks Segment acceptance and postproduction, but does not
+invalidate an already reviewed picture or stop an already authorized successor
+Seedance job. A
 technical `PASS` does not replace normal-speed human/model listening review.
+The same gate must also bind every reviewed cue to `language=Arabic`,
+`language_code=ar`, its exact Arabic text hash, and the speaker's assigned
+ElevenLabs voice ID from the asset department. Missing, English, transliterated,
+mixed-Latin, stale, or differently voiced dialogue blocks acceptance before the
+acoustic comparison.
 
 For a final film, watch clean and captioned masters end to end. Check story order,
 rhythm, framing/embedded-world readability, all speech transitions, subtitle
@@ -94,5 +122,7 @@ NO_ISSUES
 ```
 
 or a short list containing owner, Segment/time/location, observed problem,
-expected result, and smallest correction. `NO_ISSUES` is not permission to
-generate another Segment; the user still chooses accept, revise, retry, or stop.
+expected result, and smallest correction. Picture-track `NO_ISSUES` releases the
+exact attempt as predecessor evidence, but the successor still needs a fresh human
+confirmation. Audiovisual `NO_ISSUES` is not final acceptance; the user still
+chooses accept, revise, retry, or stop for the current Segment.

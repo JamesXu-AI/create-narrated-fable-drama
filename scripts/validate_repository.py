@@ -8,7 +8,6 @@ from pathlib import Path
 
 from narrated_fable_drama.core.paths import ProjectPaths
 
-
 DEPARTMENTS = (
     "screenplay-writer",
     "direct-production-design",

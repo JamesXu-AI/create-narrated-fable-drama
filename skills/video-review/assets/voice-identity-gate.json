@@ -1,5 +1,5 @@
 {
-  "contract": "video-review-voice-identity-gate-config/v1",
+  "contract": "video-review-voice-identity-gate-config/v2",
   "sample_rate_hz": 16000,
   "frame_duration_seconds": 0.025,
   "frame_hop_seconds": 0.01,
@@ -11,5 +11,8 @@
   "maximum_pitch_hz": 500.0,
   "maximum_median_pitch_ratio": 2.75,
   "maximum_spectral_centroid_ratio": 1.75,
+  "maximum_spectral_centroid_ratio_with_strong_envelope": 2.25,
+  "maximum_pitch_ratio_with_strong_envelope": 1.75,
+  "strong_spectral_envelope_similarity": 0.93,
   "minimum_spectral_envelope_similarity": 0.85
 }

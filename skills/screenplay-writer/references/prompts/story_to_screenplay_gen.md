@@ -32,8 +32,8 @@ Understand the premise, characters, wants, obstacles, beliefs, knowledge flow,
 turns, climax, consequence, ending, and fable meaning before writing tables. Do not
 output the analysis.
 
-The target country controls delivery language, natural expressions, pronunciation,
-and cultural safety. It does not relocate or culturally rewrite the story unless
+The target language is fixed to Arabic. The target country controls regional
+naturalness, pronunciation, and cultural safety. It does not relocate or culturally rewrite the story unless
 the source or user requests that change.
 
 ### Separate narrative worlds
@@ -55,7 +55,7 @@ For every spoken line, author:
 - visible or audible gate;
 - natural transition from the preceding speech or silence;
 - performance delivery;
-- exact target-language text.
+- exact Arabic text.
 
 Valid delivery modes:
 
@@ -124,10 +124,18 @@ line must fit the strict shared speech-rate gate in its own Shot, not merely in 
 total Scene Unit. Allow time for
 preparation, exact speech, listener reaction, and transition.
 
-Author Seedance-native dialogue, storytelling, breaths, ambience, effects, silence,
-and music cues. Put every audio change in the Shot where it occurs. Continuity
-Boundary `Audio Handoff` cells own cross-Segment voice bridges, ambience crossfades,
-and the return from an embedded tale.
+Author exact Arabic dialogue and storytelling for Seedance mouth performance
+followed immediately by mandatory ElevenLabs final dialogue. Seedance owns all
+ambience and action sound; the complete mixed Seedance track is muted in dialogue
+intervals and preserved unchanged elsewhere
+cuts.
+Every spoken line must contain Arabic
+script and no Latin letters. Author one continuous Seedance-native ambience
+design and every story-motivated native action effect. In replacement mode,
+Seedance guide speech is disposable and must be removed; ElevenLabs generates
+dialogue only and music remains forbidden.
+Continuity Boundary `Audio Handoff` cells own cross-Segment ElevenLabs voice
+handoffs and the return from an embedded tale.
 
 ### Character lifecycle
 
@@ -158,8 +166,8 @@ or a second screenplay representation.
 Release only when:
 
 1. every source event and ending remains true;
-2. target country, target language, `16:9`, selected/default resolution,
-   selected/default Visual Style, and Seedance-native speech are explicit;
+2. target country, fixed target language `Arabic`, `16:9`, selected/default resolution,
+   selected/default Visual Style, and `elevenlabs_dubbed` speech are explicit;
 3. every line has one speaker, valid delivery mode, natural transition, exact text,
    listener response, and changed state;
 4. the same character storyteller retains one identity and voice across on/off

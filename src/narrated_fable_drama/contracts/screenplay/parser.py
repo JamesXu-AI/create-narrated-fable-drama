@@ -74,6 +74,7 @@ PRODUCTION_INFORMATION_FIELDS = (
     "Aspect Ratio",
     "Resolution",
     "Speech Audio Source",
+    "Sound Effects Audio Source",
     "Story Premise",
     "Fable Meaning",
     "Framing and Embedded Story Strategy",
@@ -391,7 +392,7 @@ def _parse_dialogue(value: str, *, label: str) -> dict[str, str] | None:
         "gate_en": gate,
         "speech_transition_en": transition,
         "delivery_en": delivery,
-        "spoken_text_en": spoken,
+        "spoken_text_ar": spoken,
     }
 
 

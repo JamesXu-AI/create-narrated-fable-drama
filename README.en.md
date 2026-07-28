@@ -20,7 +20,10 @@ finishing pipeline are all handled automatically.
    *Accept / Redo / Pause*.
 
 > Everything else — rewriting the screenplay, designing characters and locations,
-> planning shots, generating footage with synchronized sound, per-clip QC, seam
+> planning shots, generating Seedance picture, mouth performance, native
+> ambience/action sound, and disposable guide speech, then immediately replacing
+> only character speech with exact phrase-aligned ElevenLabs Arabic,
+> per-clip QC, seam
 > repair, precise subtitles, and exporting the master — is done automatically by
 > the project according to its built-in filmmaking standards.
 
@@ -33,8 +36,8 @@ finishing pipeline are all handled automatically.
 - Ordinary character dialogue;
 - A character speaking on camera, then continuing off camera in the same voice;
 - A real-world frame story that opens into a nested fable and returns to the frame;
-- A single segment mixing dialogue, narration, ambience, sound effects, and
-  restrained score.
+- A single segment switching between dialogue, on-camera storytelling, and
+  off-camera storytelling while preserving one character voice.
 
 ---
 
@@ -50,7 +53,8 @@ finishing pipeline are all handled automatically.
 | Visual style  | Defaults to "3D Healing Animation"; specify another in chat |
 | Resolution    | Defaults to `1080p`; choose `480p` / `720p` / `1080p` / `4K` |
 | Max duration  | `240` seconds                                               |
-| Audio         | Dialogue, narration, ambience, SFX, restrained score — all auto-synced |
+| Language      | Arabic only; target country guides dialect and cultural context |
+| Audio         | Seedance generates disposable character speech plus native ambience/action audio; each clip hard-mutes the mixed Seedance track only inside dialogue-replacement intervals, preserves it unchanged elsewhere, and inserts exact ElevenLabs Arabic. ElevenLabs generates dialogue only |
 | Subtitles     | External and burned-in subtitles generated automatically; no text forced into the frame |
 
 ---
@@ -61,10 +65,14 @@ finishing pipeline are all handled automatically.
 Your story + target country
         │
         ▼
-Auto: rewrite screenplay → design characters & locations → plan shots → generate each clip
+Auto: rewrite screenplay → design characters & locations → plan shots
+        → independently audit every Seedance instruction
+        → generate one Seedance clip with picture, mouth performance, temporary speech, and native ambience/action audio
+        ├─ picture track: review immediately; after a fresh confirmation, a reviewed successor may start
+        └─ audio track: immediately remove character speech, retain Seedance ambience/action sound, and insert only ElevenLabs Arabic dialogue
         │
         ▼
-Per-clip review: watch the clip with sound → Accept / Redo / Pause   ← you step in here
+Complete A/V review after current dubbing passes → Accept / Redo / Pause   ← you step in here
         │
         ▼
 Auto: stitch → repair seams → add subtitles → export the master
@@ -89,8 +97,11 @@ Once video generation begins, the loop is:
 
 1. The project shows a summary for one clip;
 2. You confirm "generate this one clip, once";
-3. The project generates it and watches the full clip with sound;
-4. You choose accept, redo with changes, retry as-is, or pause;
+3. The project generates and immediately reviews the picture; once it passes,
+   the next picture may start after your separate fresh confirmation without
+   waiting for the current dubbing;
+4. The current clip completes Arabic dialogue replacement and full audiovisual
+   review; you then choose accept, redo with changes, retry as-is, or pause;
 5. After all clips are accepted, you confirm the final assembly plan.
 
 > **Important:** The project never batch-generates or auto-retries behind your
@@ -123,7 +134,7 @@ cinematic visual grammar, so the master looks "directed":
 > you still get a master with deliberate framing, coherent eyelines, and the right
 > emotional beats.
 
-### 2. End-to-End Automatic QC & Correction (Three Gates Guarding Quality)
+### 2. End-to-End Automatic QC & Correction (Four Gates Guarding Quality)
 
 The system automatically "inspects and signs off" at key checkpoints. Failing any
 gate **blocks the flow from moving forward**, stopping common AI-video failures at
@@ -141,9 +152,18 @@ the source:
    reviews the shot order, framing, exact lines, and elements to exclude across all
    clips at once, ensuring a complete, self-consistent "shooting brief" is handed
    to generation.
+4. **Independent prompt-audit gate** — a separate internal gate inside virtual
+   production verifies the three-part structure, eight core elements, readable
+   asset mapping, one dominant camera family per shot, anti-distortion fallback,
+   and the audio ownership rule: Seedance supplies native ambience/action sound
+   and disposable guide speech, while ElevenLabs replaces only exact Arabic
+   character dialogue.
+   Any prompt or storyboard change invalidates the old PASS.
 
-In addition, after each clip is generated the system **watches the full clip at
-normal speed with sound**, checking item by item:
+In addition, each clip receives a separate picture review first; a passing picture
+may serve as continuity evidence for the successor. After Arabic dialogue
+replacement finishes, the system **watches the full clip at normal speed with
+sound**, checking item by item:
 
 - Whether the exact line appears only once, spoken by the correct character;
 - Whether only the current on-camera speaker's mouth is moving;
@@ -203,7 +223,8 @@ all handled for you, with **no editing software and no editing knowledge require
 > seam is uncertain, it pauses to let you look rather than fudging it.
 
 > **Your benefit:** Without knowing how to edit, you still get a bunch of clips
-> cut into one clean, coherent master with synchronized sound and precise subtitles.
+> cut into one clean, coherent master with synchronized ElevenLabs Arabic dialogue
+> and precise subtitles.
 
 ---
 
@@ -225,7 +246,8 @@ A ready-to-use set of master files:
 | Situation                          | What you do                              |
 | :--------------------------------- | :--------------------------------------- |
 | It stops at the start asking for the country | Just tell it the target country in the chat |
-| It waits after a clip is generated | Watch the clip and reply *Accept / Redo / Pause* |
+| A generated picture needs review | Review the picture; a pass may release the next separately confirmed picture attempt |
+| A dubbed clip needs acceptance | Watch the complete clip with sound and reply *Accept / Redo / Pause* |
 | It warns a line is too long / pacing too fast | Ask it to shorten the line, or spread it into a longer clip |
 | A generation fails                 | It won't auto-retry; it reports the issue and asks you to authorize once more |
 

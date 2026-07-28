@@ -38,6 +38,13 @@ from narrated_fable_drama.contracts.screenplay.state import (
 )
 from narrated_fable_drama.core.speech_rate import analyze_speech
 from narrated_fable_drama.core.validation import StoryVideoError
+from narrated_fable_drama.core.project_domain import (
+    ProjectDomainError,
+    SOUND_EFFECTS_AUDIO_SOURCE,
+    SPEECH_AUDIO_SOURCE,
+    TARGET_LANGUAGE,
+    validate_arabic_dialogue,
+)
 
 
 def validate_screenplay(screenplay: dict[str, Any]) -> None:
@@ -50,14 +57,21 @@ def validate_screenplay(screenplay: dict[str, Any]) -> None:
         raise StoryVideoError("screenplay.md Aspect Ratio must be 16:9")
     if production["Resolution"] not in {"480p", "720p", "1080p", "4k"}:
         raise StoryVideoError("screenplay.md Resolution is unsupported")
-    if production["Speech Audio Source"] != "seedance_native":
+    if production["Speech Audio Source"] != SPEECH_AUDIO_SOURCE:
         raise StoryVideoError(
-            "screenplay.md Speech Audio Source must be seedance_native"
+            f"screenplay.md Speech Audio Source must be {SPEECH_AUDIO_SOURCE}"
+        )
+    if production["Sound Effects Audio Source"] != SOUND_EFFECTS_AUDIO_SOURCE:
+        raise StoryVideoError(
+            "screenplay.md Sound Effects Audio Source must be "
+            f"{SOUND_EFFECTS_AUDIO_SOURCE}"
         )
     if not _present(production["Target Country"]):
         raise StoryVideoError("screenplay.md Target Country must be present")
-    if not _present(production["Target Language"]):
-        raise StoryVideoError("screenplay.md Target Language must be present")
+    if production["Target Language"] != TARGET_LANGUAGE:
+        raise StoryVideoError(
+            f"screenplay.md Target Language must be {TARGET_LANGUAGE}"
+        )
     if not _present(production["Genre"]):
         raise StoryVideoError("Production Information Genre must be present")
     if not _present(production["Visual Style"]):
@@ -222,7 +236,7 @@ def validate_screenplay(screenplay: dict[str, Any]) -> None:
         minimum_playable_seconds = (
             sum(
                 analyze_speech(
-                    shot["dialogue"]["spoken_text_en"],
+                    shot["dialogue"]["spoken_text_ar"],
                     float(shot["duration_seconds"]),
                 )["required_seconds"]
                 for shot in segment["shots"]
@@ -239,6 +253,13 @@ def validate_screenplay(screenplay: dict[str, Any]) -> None:
         }
         character_map = {item["entity_id"]: item for item in characters}
         for entry in spoken_entries:
+            try:
+                validate_arabic_dialogue(
+                    entry["spoken_text_ar"],
+                    context=entry["line_id"],
+                )
+            except ProjectDomainError as exc:
+                raise StoryVideoError(str(exc)) from exc
             speaker_id = entry["speaker_entity_id"]
             if speaker_id not in call_map or speaker_id not in character_map:
                 raise StoryVideoError(

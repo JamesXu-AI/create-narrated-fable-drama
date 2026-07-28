@@ -31,6 +31,11 @@ def _write_subtitle_files(output_dir: Path, authority: dict[str, Any]) -> tuple[
         vtt_blocks.append(
             f"{index}\n{_format_vtt(start)} --> {_format_vtt(end)}\n{text}\n"
         )
-    srt_path.write_text("\n\n".join(srt_blocks) + ("\n" if srt_blocks else ""), encoding="utf-8")
-    vtt_path.write_text("\n".join(vtt_blocks), encoding="utf-8")
+    # A UTF-8 BOM keeps Arabic text deterministic in external players that
+    # otherwise guess a legacy code page for standalone subtitle files.
+    srt_path.write_text(
+        "\n\n".join(srt_blocks) + ("\n" if srt_blocks else ""),
+        encoding="utf-8-sig",
+    )
+    vtt_path.write_text("\n".join(vtt_blocks), encoding="utf-8-sig")
     return cues_path, srt_path, vtt_path

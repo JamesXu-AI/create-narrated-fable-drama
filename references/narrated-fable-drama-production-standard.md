@@ -35,19 +35,39 @@ story, performance, speech, camera, or continuity authority.
 - Visual style comes from conversation and defaults to `3D Healing Animation`.
 - Delivery resolution comes from conversation and defaults to `1080p`; supported
   choices are `480p`, `720p`, `1080p`, and `4k`.
-- Dialogue, storytelling, narration, breaths, reactions, ambience, effects, and
-  authored music are generated as synchronized Seedance-native audio.
+- Target language is fixed to `Arabic`; every spoken authority line uses Arabic
+  script without Latin-letter dialogue.
+- Target country is fixed to `Saudi Arabia`; role voice assets use one neutral
+  urban Riyadh Saudi accent while dialogue wording remains authored MSA.
+- Every Segment Prompt uses the sole Arabic audio mode
+  `original_audio_dialogue_replacement` and `generate_audio=true`, so Seedance
+  supplies picture, mouth performance, disposable guide speech, ambience, and
+  action sound. No silent-generation compatibility mode exists.
+- Immediately after a Segment succeeds, virtual production
+  removes every Seedance character-voice interval, preserves original
+  Seedance audio unchanged outside those intervals, hard-mutes the complete
+  mixed Seedance track inside each interval, and inserts the exact ElevenLabs
+  Arabic dialogue. Storyboard `exact_text` remains immutable; the provider
+  receives only a deterministic pronunciation rendering whose approved
+  tashkeel strips back exactly to that text. TTS is fixed to Multilingual v2 and
+  the neutral urban Riyadh Saudi voice profile.
+  ElevenLabs never generates ambience, action sound, Foley, animal sounds, or
+  music.
+- The published Segment retains the untouched provider original as
+  `seedance-source.mp4` beside the dubbed `video.mp4`; later audio, review, and
+  finishing stages never overwrite or delete that original.
+- Seedance reference audio and music remain disabled. No undubbed Segment may
+  wait for a later batch or final-edit pass.
 - Generated subtitles and on-screen transcription are forbidden. Captions belong
   to postproduction.
 - Postproduction captions copy exact text and speaker order from the Storyboard,
   but derive their final appearance times from word-level alignment against the
-  completed clean master's native audio. Missing or low-coverage alignment blocks
+  completed clean master's ElevenLabs-dubbed audio. Missing or low-coverage alignment blocks
   delivery; nominal Storyboard speech windows are never a release fallback.
 - Total runtime must not exceed 240 seconds.
 
-The target country is mandatory. If it is missing from the conversation, stop and
-ask for it before screenplay authoring. Style and resolution use their defaults
-when absent.
+The Arabic branch rejects any target country other than `Saudi Arabia`. Style
+and resolution use their defaults when absent.
 
 ## Project-wide visual doctrine
 
@@ -81,7 +101,7 @@ the tight dramatic subject
   Location, several characters being present, or a desire for “cinematic variety”
   never independently justifies widening.
 
-## Three full release gates
+## Four full release gates
 
 1. After screenplay generation, validate the complete screenplay and every exact
    line against its owning Shot duration.
@@ -91,12 +111,17 @@ the tight dramatic subject
 3. After all first-pass Segment Prompts are authored, validate the complete Prompt
    set, copied visual-doctrine declarations, exact per-Shot sizes, references,
    exact speech, and all speech windows again.
+4. Within `virtual-production`, run the separate internal audit against every
+   exact Prompt. Require the three-part structure, eight core elements, readable
+   reference mapping, one dominant camera family per Shot,
+   quality/anti-distortion fallback, Storyboard authority, and Arabic audio
+   ownership to PASS with current Prompt, Storyboard, and ruleset hashes.
 
 The shared maximum is 4.0 CJK characters per second or 2.6 non-CJK words per
 second, plus 0.25 seconds of line start/end allowance. Failure blocks downstream
 work.
 
-The Segment human-in-the-loop phase starts only after Gate 3 passes.
+The Segment human-in-the-loop phase starts only after Gate 4 passes.
 
 ## Storytelling and speech
 
@@ -153,7 +178,8 @@ When an on-screen storyteller hands off to an embedded tale:
 - carry the outgoing voice naturally across the visual cut when authored;
 - omit the storyteller and listener image references from an embedded-story
   Segment in which they must remain absent;
-- bind only the storyteller's voice reference when that voice continues; and
+- retain only the storyteller's ElevenLabs voice-ID mapping when that voice
+  continues; and
 - state in the Prompt that no storyteller body, portrait, reflection, silhouette,
   or extra observer may appear.
 
@@ -170,7 +196,7 @@ landmarks, fixed dressing, population, time, weather, light, and ambience.
 
 References are positive conditioning. Never bind a character image merely because
 the character is speaking off-screen when that image could cause an unwanted
-appearance. Use a voice reference alone for an absent storyteller. Split a
+appearance. Use the ElevenLabs voice mapping alone for an absent storyteller. Split a
 Generation Segment at a motivated speech or scene boundary when visible and absent
 reference requirements conflict.
 
@@ -183,14 +209,36 @@ reference requirements conflict.
 - `previsualize-cinematography` turns the screenplay into one executable
   `storyboard.md`, including every speech handoff, mouth state, listener reaction,
   audio bridge, reference inclusion, and reference omission.
-- `virtual-production` writes one self-contained Seedance Prompt per Generation
-  Segment directly from the Storyboard. The Prompt must say everything Seedance
-  needs to perform the speech, picture, sound, and transition.
-- `video-review` watches picture and sound and rejects unnatural speech
+- `virtual-production` writes one self-contained Arabic Seedance Prompt per
+  Generation Segment directly from the Storyboard. All model-facing prose is
+  Arabic; Latin letters are allowed only inside required provider reference
+  tokens. The Prompt directs exact-Arabic mouth performance, picture,
+  transitions, and one explicit audio mode. In dialogue-replacement mode,
+  generated character voices are disposable and forbidden in delivery. Its
+  separate internal audit checks
+  the compiled Prompt and emits the current technical PASS record required before
+  human confirmation or provider submission; the audit never writes story
+  content or silently repairs a failure.
+- After each provider task, virtual production publishes an immutable
+  `PICTURE_GENERATED` source and immediately starts separate picture-review and
+  audio-build tracks. Picture `NO_ISSUES` releases that exact attempt as
+  predecessor evidence, so a separately confirmed successor process need not wait
+  for the current audio track.
+- virtual-production's internal Segment-audio stage starts immediately, derives
+  pronunciation-only Arabic from immutable Storyboard text, aligns the exact
+  resulting dialogue to the detected Seedance speech window, records any
+  deviation from the Storyboard timing for review, removes generated character
+  speech, preserves Seedance-native ambience and action sound outside the
+  dialogue cuts, and leaves digital silence inside each cut before mixing the
+  dialogue. ElevenLabs generates Arabic dialogue only and never non-dialogue
+  audio. This stage emits the only audiovisually reviewable and acceptable
+  Segment.
+- `video-review` separately reviews the provider picture and the completed
+  picture/sound result, and rejects unnatural speech
   switches, voice drift, wrong mouth movement, unwanted storyteller appearances,
   missing reactions, crowded or full-cast staging, ambiguous/reversed eyelines,
   unearned wide coverage, or abrupt ambience changes.
-- `finish-postproduction` assembles accepted native audiovisual Segments, executes
+- `finish-postproduction` assembles accepted ElevenLabs-dubbed Segments, executes
   authored J/L audio bridges and transitions, and builds exact captions.
 
 ## Release gates
@@ -202,15 +250,20 @@ Release a phase only when:
 3. every spoken line is exact and has a delivery mode and natural transition;
 4. a character storyteller keeps one identity and voice across narrative layers;
 5. framing and embedded worlds have separate visual-population authority;
-6. every Seedance Prompt contains the Storyboard's exact speech, speaker,
-   visibility, mouth, reaction, audio-bridge, and exclusion instructions;
+6. every Seedance Prompt contains the Storyboard's exact Arabic speech, speaker,
+   visibility, audible disposable guide performance, listener mouth behavior,
+   reaction, visual handoff, mandatory native-audio replacement directive, and
+   exclusion instructions;
 7. every interaction declares a stable eyeline axis, tight Shots dominate, and
    every wider Shot is the shortest readable coverage of a story-required
    position change;
-8. adjacent Segments preserve character, prop, environment, voice, and ambience
+8. every Segment has a current
+   `seedance-prompt-internal-audit/v3` PASS record matching its exact Prompt,
+   Storyboard, and audit ruleset;
+9. adjacent Segments preserve character, prop, environment, voice, and ambience
    state without replay or unexplained reset; and
-9. every generated Segment with speech has passed approved-reference acoustic
+10. every ElevenLabs-dubbed Segment with speech has passed approved-reference acoustic
    voice-identity evidence and normal-speed listening review for timbre, register,
    age, texture, accent, pace, energy, and forbidden voice effects before
    acceptance; and
-10. generated video has been reviewed with sound before acceptance.
+11. generated video has been reviewed with sound before acceptance.

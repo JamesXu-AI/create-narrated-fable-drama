@@ -16,12 +16,12 @@ from .subtitle_alignment import (
 from .subtitle_style import (
     SubtitleBuildError,
     _caption_chunks,
-    _is_cjk,
     _load_json,
     _minimum_display_interval,
     _number,
     _picture_events,
     _readability,
+    _require_arabic_text,
     _required_display_duration,
     _target_language,
     _validate_style,
@@ -47,6 +47,39 @@ def _source_time_to_retained_time(
             )
         elapsed += range_end - range_start
     return None
+
+
+def _clamp_intervals_to_segment(
+    intervals: list[tuple[float, float]],
+    *,
+    segment_start: float,
+    segment_end: float,
+    cue_id: str,
+    alignment_spill_tolerance_seconds: float = 0.6,
+) -> list[tuple[float, float]]:
+    """Keep small ASR boundary spill inside the cue's owning Segment."""
+
+    if not intervals:
+        raise SubtitleBuildError(f"Subtitle cue has no intervals: {cue_id}")
+    if (
+        intervals[0][0]
+        < segment_start - alignment_spill_tolerance_seconds
+        or intervals[-1][1]
+        > segment_end + alignment_spill_tolerance_seconds
+    ):
+        raise SubtitleBuildError(
+            f"Final-audio alignment places {cue_id} outside its owning Segment."
+        )
+    clamped = [
+        (max(segment_start, start), min(segment_end, end))
+        for start, end in intervals
+    ]
+    if any(end <= start for start, end in clamped):
+        raise SubtitleBuildError(
+            f"Final-audio alignment leaves {cue_id} no display time inside "
+            "its owning Segment."
+        )
+    return clamped
 
 
 def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
@@ -90,6 +123,11 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
     ):
         raise SubtitleBuildError(
             "Storyboard dialogue lacks a cue ID or exact subtitle text."
+        )
+    for item in source_cue_specs:
+        item["exact_text"] = _require_arabic_text(
+            item["exact_text"],
+            context=f"subtitle cue {item['cue_id']}",
         )
     clean_master = (
         task_dir / "finish-postproduction" / "final-clean-master.mp4"
@@ -264,14 +302,12 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                 text = str(cue.get("exact_text", "")).strip()
                 if not text:
                     raise SubtitleBuildError(f"{segment_id} cue has no exact text.")
-                is_cjk = _is_cjk(text)
-                line_limit = int(
-                    style[
-                        "max_characters_per_line_cjk"
-                        if is_cjk
-                        else "max_characters_per_line_latin"
-                    ]
+                text = _require_arabic_text(
+                    text,
+                    context=f"subtitle cue {cue_id}",
                 )
+                is_cjk = False
+                line_limit = int(style["max_characters_per_line_arabic"])
                 chunks = _caption_chunks(
                     text,
                     is_cjk=is_cjk,
@@ -297,6 +333,12 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                     ),
                     media_duration_seconds=media_duration,
                 )
+                intervals = _clamp_intervals_to_segment(
+                    intervals,
+                    segment_start=event["start"],
+                    segment_end=event["end"],
+                    cue_id=cue_id,
+                )
                 source_position = source_cue_positions[cue_id]
                 prior_limit = event["start"]
                 if source_position > 0:
@@ -305,11 +347,11 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                     ]
                     prior_limit = max(
                         prior_limit,
-                        float(prior_alignment["speech_end_seconds"])
-                        + _number(
-                            style["subtitle_trail_out_seconds"],
-                            "subtitle_trail_out_seconds",
-                        ),
+                        (
+                            float(prior_alignment["speech_end_seconds"])
+                            + float(alignment["speech_start_seconds"])
+                        )
+                        / 2.0,
                     )
                 next_limit = event["end"]
                 if source_position + 1 < len(source_cue_ids):
@@ -318,12 +360,18 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                     ]
                     next_limit = min(
                         next_limit,
-                        float(next_alignment["speech_start_seconds"])
-                        - _number(
-                            style["subtitle_lead_in_seconds"],
-                            "subtitle_lead_in_seconds",
-                        ),
+                        (
+                            float(alignment["speech_end_seconds"])
+                            + float(next_alignment["speech_start_seconds"])
+                        )
+                        / 2.0,
                     )
+                intervals = _clamp_intervals_to_segment(
+                    intervals,
+                    segment_start=prior_limit,
+                    segment_end=next_limit,
+                    cue_id=cue_id,
+                )
                 readability_intervals: list[tuple[float, float]] = []
                 for part_index, ((chunk_text, rendered_text), interval) in enumerate(
                     zip(chunks, intervals)
@@ -356,8 +404,8 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
                     )
                 intervals = readability_intervals
                 if (
-                    intervals[0][0] < event["start"] - 0.25
-                    or intervals[-1][1] > event["end"] + 0.25
+                    intervals[0][0] < event["start"] - 0.001
+                    or intervals[-1][1] > event["end"] + 0.001
                 ):
                     raise SubtitleBuildError(
                         f"Final-audio alignment places {cue_id} outside "
@@ -437,6 +485,8 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
         "timing_authority": "final_clean_master_word_alignment",
         "alignment_evidence": alignment_evidence,
         "language": language,
+        "language_code": "ar",
+        "arabic_only_no_latin": "PASS",
         "style_path": str(style_path.resolve()),
         "picture_edl_path": str(edl_path.resolve()),
         "source_cue_count": source_cue_count,

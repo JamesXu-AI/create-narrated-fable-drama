@@ -47,17 +47,16 @@ Avoid planning patterns such as `0–3s`, `4–8s`, `9–12s`; they leave one-se
 
 Count spoken content, not speaker labels or punctuation. Treat rates as planning heuristics, then read the line aloud mentally in the specified performance.
 
-### Chinese
+### Arabic
 
-- Deliberate, intimate, elderly, exhausted, or emotional: about `2.5–3.5 Chinese characters/second`.
-- Normal clear dramatic dialogue: about `3.5–4.5 characters/second`.
-- Urgent but intelligible: about `4.5–5.5 characters/second`; use only when the character and scene support it.
-
-### English
-
-- Deliberate: about `100–130 words/minute`.
-- Normal screen dialogue: about `130–170 words/minute`.
-- Urgent but intelligible: about `170–190 words/minute`.
+- Deliberate, intimate, elderly, exhausted, or emotional: about `80–105 Arabic
+  words/minute`.
+- Normal clear dramatic dialogue: about `105–135 Arabic words/minute`.
+- Urgent but intelligible: about `135–156 Arabic words/minute`; use only when the
+  character and scene support it.
+- The shared hard gate remains at most `2.6 Arabic words/second` (`156
+  words/minute`) plus the line allowance. English, transliteration, mixed-Latin,
+  CJK, and generic non-CJK calculations are not valid in this branch.
 
 Quoted hesitations, repeated words, laughs, sobs, and unfinished starts consume time. An ellipsis does not have a fixed duration; assign its intended pause explicitly.
 
@@ -66,7 +65,7 @@ Quoted hesitations, repeated words, laughs, sobs, and unfinished starts consume 
 Use:
 
 ```text
-spoken_line_time = words_or_characters / chosen_delivery_rate + internal_pauses
+spoken_line_time = arabic_words / chosen_delivery_rate + internal_pauses
 
 minimum_dialogue_beat =
 pre-line recognition/breath
