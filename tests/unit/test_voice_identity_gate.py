@@ -32,6 +32,47 @@ class VoiceIdentityGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.config = load_config()
 
+    def test_timbre_similarity_gate_straddles_point_75(
+        self,
+    ) -> None:
+        reference_envelope = np.zeros(26)
+        reference_envelope[0] = 1 / np.sqrt(2)
+        reference_envelope[1] = -1 / np.sqrt(2)
+        orthogonal_envelope = np.zeros(26)
+        orthogonal_envelope[0] = 1 / np.sqrt(6)
+        orthogonal_envelope[1] = 1 / np.sqrt(6)
+        orthogonal_envelope[2] = -2 / np.sqrt(6)
+
+        def profile(similarity: float) -> dict[str, object]:
+            envelope = (
+                similarity * reference_envelope
+                + np.sqrt(1 - similarity**2) * orthogonal_envelope
+            )
+            return {
+                "median_pitch_hz": 150.0,
+                "median_spectral_centroid_hz": 500.0,
+                "mean_log_mel_spectral_envelope": envelope.tolist(),
+            }
+
+        reference = profile(1.0)
+        passing = compare_profiles(
+            reference,
+            profile(0.751),
+            config=self.config,
+        )
+        failing = compare_profiles(
+            reference,
+            profile(0.749),
+            config=self.config,
+        )
+
+        self.assertEqual(
+            self.config["minimum_spectral_envelope_similarity"],
+            0.75,
+        )
+        self.assertEqual(passing["status"], "PASS")
+        self.assertEqual(failing["status"], "FAIL")
+
     def test_stable_synthetic_voice_produces_a_profile(self) -> None:
         sample_rate = int(self.config["sample_rate_hz"])
         seconds = np.arange(sample_rate * 2) / sample_rate
@@ -71,6 +112,27 @@ class VoiceIdentityGateTests(unittest.TestCase):
         self.assertEqual(comparison["status"], "FAIL")
         self.assertIn(
             "spectral_envelope_similarity is below",
+            comparison["failure_reasons"][0],
+        )
+
+    def test_pitch_mismatch_still_blocks(self) -> None:
+        profile = {
+            "median_pitch_hz": 150.0,
+            "median_spectral_centroid_hz": 500.0,
+            "mean_log_mel_spectral_envelope": [
+                float(index) for index in range(26)
+            ],
+        }
+        shifted = dict(profile)
+        shifted["median_pitch_hz"] = 500.0
+        comparison = compare_profiles(
+            profile,
+            shifted,
+            config=self.config,
+        )
+        self.assertEqual(comparison["status"], "FAIL")
+        self.assertIn(
+            "median_pitch_ratio exceeds",
             comparison["failure_reasons"][0],
         )
 

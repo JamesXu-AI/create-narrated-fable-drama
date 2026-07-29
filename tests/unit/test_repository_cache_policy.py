@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import runpy
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -83,6 +84,38 @@ def test_python_runner_defaults_to_canonical_cache_prefix() -> None:
     assert completed.stdout.strip() == str(
         REPOSITORY_ROOT / ".cache" / "pycache"
     )
+
+
+def test_python_runner_prefers_repository_virtual_environment(
+    tmp_path: Path,
+) -> None:
+    repository_root = tmp_path / "repository"
+    scripts_dir = repository_root / "scripts"
+    virtualenv_bin = repository_root / ".venv" / "bin"
+    scripts_dir.mkdir(parents=True)
+    virtualenv_bin.mkdir(parents=True)
+    runner = scripts_dir / "run_python.sh"
+    shutil.copy2(REPOSITORY_ROOT / "scripts" / "run_python.sh", runner)
+    virtualenv_python = virtualenv_bin / "python"
+    virtualenv_python.write_text(
+        "#!/bin/sh\nprintf '%s\\n' repository-virtualenv\n",
+        encoding="utf-8",
+    )
+    virtualenv_python.chmod(0o755)
+    environment = os.environ.copy()
+    environment.pop("PYTHON_BIN", None)
+    environment.pop("VIRTUAL_ENV", None)
+
+    completed = subprocess.run(
+        [str(runner), "-c", "ignored"],
+        cwd=repository_root,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.stdout.strip() == "repository-virtualenv"
 
 
 def test_tool_caches_live_under_canonical_cache_directory() -> None:

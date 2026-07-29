@@ -1,12 +1,28 @@
 ---
 name: video-review
-description: Independently review AI narrated drama and fable artifacts or completed Seedance clips for story causality, exact speech, natural dialogue/narration handoffs, character and world continuity, picture, and native sound. Return NO_ISSUES or concise owner-routed corrections; create no approval artifacts.
+description: Review only screenplay, Storyboard, generated Segment, and final-film artifacts produced by this repository's create-narrated-fable-drama authority chain. Use after a repository-local authoring stage, Segment attempt, or final assembly when the task's authored sources and approved voice references are available. Follow the task language; do not trigger for arbitrary Seedance clips, external provider workflows, or projects without this repository's task structure. Return NO_ISSUES or concise owner-routed corrections; create no approval artifacts.
 ---
 
 # Video Review
 
 Read the [Narrated Fable Drama Production Standard](../../references/narrated-fable-drama-production-standard.md)
 and [Human-in-the-Loop Guided Workflow](../../references/human-in-the-loop-guided-workflow.md).
+
+## Scope gate
+
+Continue only when all of the following are true:
+
+- this file resolves to this repository's `skills/video-review/SKILL.md`;
+- the artifact belongs to a task under this repository's
+  `workspace/tasks/<task>/`; and
+- the review can use the repository authority chain, including the applicable
+  screenplay, Storyboard, Segment Prompt, accepted predecessor, or approved voice
+  reference.
+
+Otherwise stop and use the owning project's review workflow. A provider name or
+the words `Seedance`, `Segment`, `video review`, or `completed clip` do not
+establish scope. Take the target language from the task screenplay; this Skill
+has no language-specific default or branch.
 
 Review the actual artifact or complete audiovisual clip, identify concrete
 problems, name the owning department, and recheck only the affected result after

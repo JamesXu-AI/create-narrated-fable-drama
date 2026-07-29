@@ -22,6 +22,11 @@ Use only these repository-local production departments:
 - `skills/video-review/SKILL.md`
 - `skills/finish-postproduction/SKILL.md`
 
+Resolve every department path from this repository root and require its resolved
+path to remain under this repository's `skills/` directory. A matching Skill name
+or broad description from the global catalog or a plugin is not an equivalent
+department and must not be substituted.
+
 Do not use an external story, image, video, audio, review, or postproduction Skill.
 The sole system-Skill exception is `skill-creator`, and only when the user asks to
 maintain this repository's Skill files.

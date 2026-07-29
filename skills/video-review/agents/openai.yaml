@@ -1,4 +1,7 @@
 interface:
   display_name: "Narrated Fable Video Review"
-  short_description: "检查对白、角色旁白、画面与声音衔接"
-  default_prompt: "Use $video-review to watch the complete narrated-drama or fable Segment with sound, verify the fewest necessary visible characters, stable A/B eyeline axis and screen directions, ECU/CU/MCU dominance, and that every wider interval only covers the shortest authored position change before returning tight, alongside exact speech, mouth, voice, ambience, continuity, and then return NO_ISSUES or concise owner-routed corrections."
+  short_description: "仅审查本仓库叙事寓言流程中的剧本、分段视频与最终成片"
+  default_prompt: "Use $video-review only for artifacts in this repository's create-narrated-fable-drama authority chain, verify authored speech, voice, picture, continuity, and coverage, then return NO_ISSUES or concise owner-routed corrections."
+
+policy:
+  allow_implicit_invocation: false

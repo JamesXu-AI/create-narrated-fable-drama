@@ -42,12 +42,13 @@ scripts/run_python.sh -m narrated_fable_drama.cli validate-repository
 scripts/run_python.sh scripts/validate_repository.py
 ```
 
-仓库内的 Python 命令统一通过 `scripts/run_python.sh` 执行。它不会改变所选
-Python 解释器或命令参数，只会在解释器启动前把字节码缓存定向到
-`.cache/pycache/`。pytest 和 Ruff 的缓存也分别位于 `.cache/pytest/` 与
-`.cache/ruff/`；因此 `.cache/` 可以整体删除，`src/`、`skills/`、`scripts/`
-和 `tests/` 中不应再出现分散的缓存目录。如需指定解释器，可设置
-`PYTHON_BIN=/path/to/python`。
+仓库内的 Python 命令统一通过 `scripts/run_python.sh` 执行。运行器依次使用
+`PYTHON_BIN` 显式指定的解释器、当前已激活的虚拟环境、仓库根目录的
+`.venv/bin/python`，最后才回退到 `PATH` 中的 `python3`；命令参数保持不变。
+它还会在解释器启动前把字节码缓存定向到 `.cache/pycache/`。pytest 和 Ruff
+的缓存也分别位于 `.cache/pytest/` 与 `.cache/ruff/`；因此 `.cache/` 可以
+整体删除，`src/`、`skills/`、`scripts/` 和 `tests/` 中不应再出现分散的缓存
+目录。如需指定解释器，可设置 `PYTHON_BIN=/path/to/python`。
 
 ## 创建任务
 
@@ -451,6 +452,7 @@ NARRATED_FABLE_DRAMA_WORKSPACE
 | 写剧本前停止 | 缺少必填目标国家；在对话中提供即可 |
 | `Cannot find the narrated-fable repository` | 从仓库内运行，或设置有效的 `NARRATED_FABLE_DRAMA_ROOT` |
 | 无法导入 `narrated_fable_drama` | 在仓库根目录执行 `python3 -m pip install -e .` |
+| 无法导入 `numpy` 等项目依赖 | 使用 `scripts/run_python.sh`；它会优先使用仓库 `.venv`。若 `.venv` 尚未安装依赖，执行 `.venv/bin/python -m pip install -e .` |
 | `speech_rate_gate` 失败 | 缩短精确台词或增加所属 Shot/Segment 的可用说话时间 |
 | 角色/资产范围失败 | 检查剧本 `Kind`、角色定义和最多 8 种视觉类型限制 |
 | 发现未登记资产文件 | 恢复其目录语义和 provider URI 到 `workspace/assets/assets.json`，不要覆盖生成 |

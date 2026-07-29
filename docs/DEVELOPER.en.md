@@ -48,9 +48,11 @@ You can also run the underlying script directly:
 scripts/run_python.sh scripts/validate_repository.py
 ```
 
-Run repository Python commands through `scripts/run_python.sh`. It preserves the
-selected interpreter and all command arguments, but sets the bytecode cache
-destination to `.cache/pycache/` before Python starts. Pytest and Ruff use
+Run repository Python commands through `scripts/run_python.sh`. The runner uses
+an explicit `PYTHON_BIN` first, then the currently activated virtual environment,
+then `.venv/bin/python` at the repository root, and only then falls back to
+`python3` on `PATH`. It preserves all command arguments and sets the bytecode
+cache destination to `.cache/pycache/` before Python starts. Pytest and Ruff use
 `.cache/pytest/` and `.cache/ruff/`, respectively. The entire `.cache/` directory
 is disposable, and cache directories should no longer appear throughout `src/`,
 `skills/`, `scripts/`, or `tests/`. Set `PYTHON_BIN=/path/to/python` to select an
@@ -545,6 +547,7 @@ A custom root must contain `pyproject.toml` and `SKILL.md`.
 | Stops before writing the screenplay | The required target country is missing; provide it in the conversation |
 | `Cannot find the narrated-fable repository` | Run from inside the repository, or set a valid `NARRATED_FABLE_DRAMA_ROOT` |
 | Cannot import `narrated_fable_drama` | Run `python3 -m pip install -e .` at the repository root |
+| Cannot import `numpy` or another project dependency | Use `scripts/run_python.sh`; it prefers the repository `.venv`. If `.venv` does not have the dependencies yet, run `.venv/bin/python -m pip install -e .` |
 | `speech_rate_gate` fails | Shorten the exact line or add more speaking time to the owning Shot/Segment |
 | Character/asset scope fails | Check the screenplay `Kind`, character definitions, and the limit of at most 8 visual types |
 | An unregistered asset file is found | Restore its directory semantics and provider URI into `workspace/assets/assets.json`; do not overwrite generation |
