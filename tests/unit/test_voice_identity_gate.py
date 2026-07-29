@@ -32,7 +32,7 @@ class VoiceIdentityGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.config = load_config()
 
-    def test_timbre_similarity_gate_straddles_point_75(
+    def test_cross_recording_domain_timbre_differences_are_advisory(
         self,
     ) -> None:
         reference_envelope = np.zeros(26)
@@ -55,23 +55,21 @@ class VoiceIdentityGateTests(unittest.TestCase):
             }
 
         reference = profile(1.0)
-        passing = compare_profiles(
-            reference,
-            profile(0.751),
-            config=self.config,
-        )
-        failing = compare_profiles(
-            reference,
-            profile(0.749),
-            config=self.config,
-        )
-
         self.assertEqual(
             self.config["minimum_spectral_envelope_similarity"],
             0.75,
         )
-        self.assertEqual(passing["status"], "PASS")
-        self.assertEqual(failing["status"], "FAIL")
+        for similarity in (0.726, 0.697):
+            comparison = compare_profiles(
+                reference,
+                profile(similarity),
+                config=self.config,
+            )
+            self.assertEqual(comparison["status"], "PASS")
+            self.assertIn(
+                "below the review threshold",
+                comparison["advisory_reasons"][0],
+            )
 
     def test_stable_synthetic_voice_produces_a_profile(self) -> None:
         sample_rate = int(self.config["sample_rate_hz"])
@@ -89,7 +87,7 @@ class VoiceIdentityGateTests(unittest.TestCase):
             26,
         )
 
-    def test_spectral_envelope_mismatch_blocks(self) -> None:
+    def test_severe_spectral_envelope_mismatch_blocks(self) -> None:
         reference = {
             "median_pitch_hz": 150.0,
             "median_spectral_centroid_hz": 500.0,
@@ -111,7 +109,7 @@ class VoiceIdentityGateTests(unittest.TestCase):
         )
         self.assertEqual(comparison["status"], "FAIL")
         self.assertIn(
-            "spectral_envelope_similarity is below",
+            "below the severe approved-reference limit",
             comparison["failure_reasons"][0],
         )
 

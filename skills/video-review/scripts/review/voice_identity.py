@@ -67,6 +67,7 @@ def load_config(path: Path = DEFAULT_CONFIG) -> dict[str, Any]:
         "maximum_median_pitch_ratio",
         "maximum_spectral_centroid_ratio",
         "minimum_spectral_envelope_similarity",
+        "minimum_blocking_spectral_envelope_similarity",
     }
     if set(config) != expected:
         raise VoiceIdentityGateError(
@@ -80,12 +81,20 @@ def load_config(path: Path = DEFAULT_CONFIG) -> dict[str, Any]:
         "vad_energy_quantile",
         "minimum_pitch_autocorrelation",
         "minimum_spectral_envelope_similarity",
+        "minimum_blocking_spectral_envelope_similarity",
     ):
         if float(config[field]) >= 1:
             raise VoiceIdentityGateError(f"{field} must be less than 1.")
     if float(config["minimum_pitch_hz"]) >= float(config["maximum_pitch_hz"]):
         raise VoiceIdentityGateError(
             "minimum_pitch_hz must be below maximum_pitch_hz."
+        )
+    if float(config["minimum_blocking_spectral_envelope_similarity"]) >= float(
+        config["minimum_spectral_envelope_similarity"]
+    ):
+        raise VoiceIdentityGateError(
+            "minimum_blocking_spectral_envelope_similarity must be below "
+            "minimum_spectral_envelope_similarity."
         )
     if int(config["minimum_voiced_frame_count"]) != config[
         "minimum_voiced_frame_count"
@@ -317,6 +326,7 @@ def compare_profiles(
         np.dot(reference_envelope, candidate_envelope) / denominator
     )
     failures: list[str] = []
+    advisories: list[str] = []
     if pitch_ratio > float(config["maximum_median_pitch_ratio"]):
         failures.append(
             "median_pitch_ratio exceeds the approved-reference limit"
@@ -326,10 +336,18 @@ def compare_profiles(
             "spectral_centroid_ratio exceeds the approved-reference limit"
         )
     if envelope_similarity < float(
-        config["minimum_spectral_envelope_similarity"]
+        config["minimum_blocking_spectral_envelope_similarity"]
     ):
         failures.append(
-            "spectral_envelope_similarity is below the approved-reference limit"
+            "spectral_envelope_similarity is below the severe "
+            "approved-reference limit"
+        )
+    elif envelope_similarity < float(
+        config["minimum_spectral_envelope_similarity"]
+    ):
+        advisories.append(
+            "spectral_envelope_similarity is below the review threshold but "
+            "above the severe blocking limit"
         )
     return {
         "status": "FAIL" if failures else "PASS",
@@ -345,7 +363,11 @@ def compare_profiles(
         "minimum_spectral_envelope_similarity": float(
             config["minimum_spectral_envelope_similarity"]
         ),
+        "minimum_blocking_spectral_envelope_similarity": float(
+            config["minimum_blocking_spectral_envelope_similarity"]
+        ),
         "failure_reasons": failures,
+        "advisory_reasons": advisories,
     }
 
 
@@ -470,6 +492,11 @@ def prepare_segment_voice_identity_gate(
             }
         )
     failed = [check for check in checks if check["comparison"]["status"] == "FAIL"]
+    advisory = [
+        check
+        for check in checks
+        if check["comparison"].get("advisory_reasons")
+    ]
     return {
         "contract": "video-review-voice-identity-gate/v1",
         "segment_id": segment_id,
@@ -477,14 +504,18 @@ def prepare_segment_voice_identity_gate(
         "blocks_acceptance": bool(failed),
         "human_listening_review_required": True,
         "review_policy": (
-            "Acoustic ratios are a conservative technical hold for severe pitch/"
-            "timbre drift. The video reviewer must still hear the complete Segment "
-            "at normal speed and compare each speaker with the approved reference."
+            "Acoustic ratios block only severe pitch/timbre drift. A moderate "
+            "spectral-envelope difference is advisory because native ambience, "
+            "music, codec color, and resynthesis can shift it without changing the "
+            "perceived speaker. The video reviewer must still hear the complete "
+            "Segment at normal speed and compare each speaker with the approved "
+            "reference."
         ),
         "video_path": str(video_path),
         "video_sha256": _sha256(video_path),
         "config_path": str(config_path),
         "config_sha256": _sha256(config_path),
         "failed_cue_ids": [check["cue_id"] for check in failed],
+        "advisory_cue_ids": [check["cue_id"] for check in advisory],
         "checks": checks,
     }

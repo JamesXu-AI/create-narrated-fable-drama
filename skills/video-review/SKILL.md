@@ -83,7 +83,9 @@ For generated video, watch the full clip at normal speed with sound. Check:
 Run the repository voice-identity evidence gate for every completed Segment that
 contains speech. A technical `FAIL`, missing voice reference, unreadable audio, or
 unmeasurable speech blocks Segment acceptance and successor generation. A
-technical `PASS` does not replace normal-speed human/model listening review.
+moderate spectral-envelope advisory does not independently prove voice replacement
+and does not block when the severe acoustic limits pass. A technical `PASS` does
+not replace normal-speed human/model listening review.
 
 For a final film, watch clean and captioned masters end to end. Check story order,
 rhythm, framing/embedded-world readability, all speech transitions, subtitle

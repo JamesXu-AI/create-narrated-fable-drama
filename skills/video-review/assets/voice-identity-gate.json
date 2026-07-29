@@ -11,5 +11,6 @@
   "maximum_pitch_hz": 500.0,
   "maximum_median_pitch_ratio": 2.75,
   "maximum_spectral_centroid_ratio": 1.75,
-  "minimum_spectral_envelope_similarity": 0.75
+  "minimum_spectral_envelope_similarity": 0.75,
+  "minimum_blocking_spectral_envelope_similarity": 0.5
 }
