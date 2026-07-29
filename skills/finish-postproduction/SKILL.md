@@ -36,7 +36,7 @@ corrupt, unexplained-silent, reordered, or unaccepted coverage.
 Generate the real-media evidence before writing any edit:
 
 ```bash
-python3 skills/finish-postproduction/scripts/inspect_finish_media.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/inspect_finish_media.py \
   --task-dir TASK_DIR
 ```
 
@@ -45,7 +45,7 @@ Read the emitted manifest and every picture-and-sound artifact. Author
 plan against the same evidence and source media:
 
 ```bash
-python3 skills/finish-postproduction/scripts/validate_repair_plan.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/validate_repair_plan.py \
   --task-dir TASK_DIR \
   --evidence-manifest TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
   --repair-plan TASK_DIR/.pending/finish-postproduction/llm-repair-plan.json
@@ -55,7 +55,7 @@ When a picture cut, action phase, dissolve, color repair, or audio handoff is no
 certain, author separate candidate plans and render each requested seam:
 
 ```bash
-python3 skills/finish-postproduction/scripts/render_repair_candidate.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/render_repair_candidate.py \
   --task-dir TASK_DIR \
   --evidence-manifest EVIDENCE_MANIFEST \
   --repair-plan CANDIDATE_PLAN \
@@ -100,7 +100,7 @@ The model inspects and selects candidates. The tool never ranks them.
 Run:
 
 ```bash
-python3 skills/finish-postproduction/scripts/finish_postproduction.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/finish_postproduction.py \
   --task-dir TASK_DIR \
   --evidence-manifest TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
   --repair-plan TASK_DIR/.pending/finish-postproduction/llm-repair-plan.json

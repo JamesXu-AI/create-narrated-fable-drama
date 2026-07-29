@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -15,7 +16,17 @@ def _validate_repository() -> int:
         sys.executable,
         str(paths.repository_root / "scripts" / "validate_repository.py"),
     ]
-    return subprocess.run(command, cwd=paths.repository_root, check=False).returncode
+    environment = os.environ.copy()
+    environment.setdefault(
+        "PYTHONPYCACHEPREFIX",
+        str(paths.repository_root / ".cache" / "pycache"),
+    )
+    return subprocess.run(
+        command,
+        cwd=paths.repository_root,
+        env=environment,
+        check=False,
+    ).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

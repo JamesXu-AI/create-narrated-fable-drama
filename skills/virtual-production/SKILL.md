@@ -72,7 +72,7 @@ Author every Segment Prompt before opening the human loop. Then validate the
 complete Prompt set:
 
 ```bash
-python3 skills/virtual-production/scripts/validate_segment_scripts.py validate \
+scripts/run_python.sh skills/virtual-production/scripts/validate_segment_scripts.py validate \
   --task-dir TASK_DIR
 ```
 
@@ -82,7 +82,7 @@ Require `first_full_prompt_gate=PASS` and the full Segment-Prompt
 Preflight one Segment:
 
 ```bash
-python3 skills/virtual-production/scripts/preflight_segment.py \
+scripts/run_python.sh skills/virtual-production/scripts/preflight_segment.py \
   --task-dir TASK_DIR --segment segment-NNN
 ```
 
@@ -90,7 +90,7 @@ Only after that first full gate passes, begin the human-in-the-loop phase and
 generate after the human approves that exact Segment Prompt:
 
 ```bash
-python3 skills/virtual-production/scripts/generate_segment_videos.py \
+scripts/run_python.sh skills/virtual-production/scripts/generate_segment_videos.py \
   --task-dir TASK_DIR --segments segment-NNN
 ```
 

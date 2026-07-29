@@ -111,16 +111,16 @@ loop begins only after every Segment Prompt exists and the first full Prompt gat
 passes. Then run:
 
 ```text
-python3 skills/screenplay-writer/scripts/character_performance_map.py role-asset-scope \
+scripts/run_python.sh skills/screenplay-writer/scripts/character_performance_map.py role-asset-scope \
   --task-dir TASK_DIR
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --inspect-semantic-reuse
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --max-workers 4 \
   [--codex-reuse-asset TARGET_ASSET_ID=SOURCE_ASSET_ID ...] \
   [--codex-regenerate-visual-asset TARGET_ASSET_ID ...] \
   [--codex-accept-generated-visual-asset ASSET_ID=SOURCE_URI ...]
-python3 skills/direct-production-design/scripts/validate_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/validate_production_design.py \
   --task-dir TASK_DIR
 ```
 

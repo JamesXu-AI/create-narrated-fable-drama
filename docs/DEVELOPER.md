@@ -33,14 +33,21 @@ python3 -m pip install 'tos>=2.9,<3'
 先确认仓库结构和共享包可用：
 
 ```bash
-narrated-fable-drama validate-repository
+scripts/run_python.sh -m narrated_fable_drama.cli validate-repository
 ```
 
-也可以直接运行：
+也可以直接运行底层脚本：
 
 ```bash
-python3 scripts/validate_repository.py
+scripts/run_python.sh scripts/validate_repository.py
 ```
+
+仓库内的 Python 命令统一通过 `scripts/run_python.sh` 执行。它不会改变所选
+Python 解释器或命令参数，只会在解释器启动前把字节码缓存定向到
+`.cache/pycache/`。pytest 和 Ruff 的缓存也分别位于 `.cache/pytest/` 与
+`.cache/ruff/`；因此 `.cache/` 可以整体删除，`src/`、`skills/`、`scripts/`
+和 `tests/` 中不应再出现分散的缓存目录。如需指定解释器，可设置
+`PYTHON_BIN=/path/to/python`。
 
 ## 创建任务
 
@@ -92,11 +99,11 @@ embedded_character_dialogue
 `screenplay.md`：
 
 ```bash
-python3 skills/screenplay-writer/scripts/build_screenplay.py build \
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py build \
   --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/build_screenplay.py check \
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py check \
   --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/character_performance_map.py \
+scripts/run_python.sh skills/screenplay-writer/scripts/character_performance_map.py \
   role-asset-scope --task-dir TASK_DIR
 ```
 
@@ -129,14 +136,14 @@ workspace/assets/costumes/
 任何 Seedream 调用前必须先检查语义复用和未登记的现存文件：
 
 ```bash
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --inspect-semantic-reuse
 ```
 
 确认复用、重新生成或接受新图片后再执行构建。以下参数可以重复使用：
 
 ```bash
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --max-workers 4 \
   --codex-reuse-asset TARGET_ASSET_ID=SOURCE_ASSET_ID \
   --codex-regenerate-visual-asset TARGET_ASSET_ID \
@@ -146,7 +153,7 @@ python3 skills/direct-production-design/scripts/build_initial_production_design.
 最后验证：
 
 ```bash
-python3 skills/direct-production-design/scripts/validate_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/validate_production_design.py \
   --task-dir TASK_DIR
 ```
 
@@ -168,7 +175,7 @@ Storyboard 负责最终的表演、摄影、灯光、剪辑、原生声音、参
 验证：
 
 ```bash
-python3 skills/previsualize-cinematography/scripts/validate_storyboard.py \
+scripts/run_python.sh skills/previsualize-cinematography/scripts/validate_storyboard.py \
   --task-dir TASK_DIR
 ```
 
@@ -190,7 +197,7 @@ Prompt 必须自包含全部镜头顺序、动作、表演、精确台词、嘴�
 必须先写完全部首版 Prompt，再运行无 `--segments` 参数的全量验证：
 
 ```bash
-python3 skills/virtual-production/scripts/validate_segment_scripts.py validate \
+scripts/run_python.sh skills/virtual-production/scripts/validate_segment_scripts.py validate \
   --task-dir TASK_DIR
 ```
 
@@ -208,7 +215,7 @@ speech_rate_gate.status=PASS
 生成前先预检当前段：
 
 ```bash
-python3 skills/virtual-production/scripts/preflight_segment.py \
+scripts/run_python.sh skills/virtual-production/scripts/preflight_segment.py \
   --task-dir TASK_DIR --segment segment-NNN
 ```
 
@@ -216,7 +223,7 @@ python3 skills/virtual-production/scripts/preflight_segment.py \
 人工确认断言：
 
 ```bash
-python3 skills/virtual-production/scripts/generate_segment_videos.py \
+scripts/run_python.sh skills/virtual-production/scripts/generate_segment_videos.py \
   --task-dir TASK_DIR \
   --segments segment-NNN \
   --human-confirmed-segment segment-NNN
@@ -245,7 +252,7 @@ TASK_DIR/.pending/virtual-production/generation-segments/segment-NNN/
 `production-record.json`，且用户确认装配计划后，先生成真实媒体证据：
 
 ```bash
-python3 skills/finish-postproduction/scripts/inspect_finish_media.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/inspect_finish_media.py \
   --task-dir TASK_DIR
 ```
 
@@ -258,7 +265,7 @@ TASK_DIR/.pending/finish-postproduction/llm-repair-plan.json
 验证修复计划：
 
 ```bash
-python3 skills/finish-postproduction/scripts/validate_repair_plan.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/validate_repair_plan.py \
   --task-dir TASK_DIR \
   --evidence-manifest \
     TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
@@ -269,7 +276,7 @@ python3 skills/finish-postproduction/scripts/validate_repair_plan.py \
 让脚本自动决定创作修复。最终执行：
 
 ```bash
-python3 skills/finish-postproduction/scripts/finish_postproduction.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/finish_postproduction.py \
   --task-dir TASK_DIR \
   --evidence-manifest \
     TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
@@ -420,9 +427,9 @@ provider 只从宿主进程环境读取配置，不会自动加载仓库内 `.en
 安全检查配置状态，不输出密钥：
 
 ```bash
-python3 -m narrated_fable_drama.providers.seedream --pretty config
-python3 -m narrated_fable_drama.providers.seedance --pretty config
-python3 -m narrated_fable_drama.providers.seedaudio --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedream --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedance --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedaudio --pretty config
 ```
 
 远程访问只能通过 `src/narrated_fable_drama/providers/`。部门脚本不能重复实现
@@ -459,15 +466,15 @@ NARRATED_FABLE_DRAMA_WORKSPACE
 先运行最接近改动的测试，再运行完整单元测试和结构校验：
 
 ```bash
-python3 -m pytest tests/unit/test_relevant_file.py -q
-python3 -m pytest tests/unit -q
-python3 scripts/validate_repository.py
+scripts/run_python.sh -m pytest tests/unit/test_relevant_file.py -q
+scripts/run_python.sh -m pytest tests/unit -q
+scripts/run_python.sh scripts/validate_repository.py
 ```
 
 代码风格配置位于 `pyproject.toml`：
 
 ```bash
-python3 -m ruff check src skills scripts tests
+scripts/run_python.sh -m ruff check src skills scripts tests
 ```
 
 仓库定位与检索请遵循 `AGENTS.md`：先按路径地图缩小范围，再搜索符号并只读取

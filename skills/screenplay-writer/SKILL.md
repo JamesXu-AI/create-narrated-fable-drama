@@ -122,9 +122,9 @@ needing the same positive character image both present and absent.
 11. Run:
 
 ```text
-python3 skills/screenplay-writer/scripts/build_screenplay.py build --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/build_screenplay.py check --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/character_performance_map.py role-asset-scope \
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py build --task-dir TASK_DIR
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py check --task-dir TASK_DIR
+scripts/run_python.sh skills/screenplay-writer/scripts/character_performance_map.py role-asset-scope \
   --task-dir TASK_DIR
 ```
 

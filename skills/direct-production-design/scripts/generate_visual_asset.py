@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+import sys
 import tempfile
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit

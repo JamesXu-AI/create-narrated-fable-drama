@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
   "faster-whisper>=1.2,<2",
   "numpy>=2,<3",
+  "tos>=2.9,<3",
 ]
 
 [project.scripts]
@@ -19,12 +20,14 @@ narrated-fable-drama = "narrated_fable_drama.cli:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
+cache_dir = ".cache/pytest"
 testpaths = ["tests"]
 markers = [
   "live_provider: requires real remote provider credentials",
 ]
 
 [tool.ruff]
+cache-dir = ".cache/ruff"
 target-version = "py311"
 line-length = 88
 

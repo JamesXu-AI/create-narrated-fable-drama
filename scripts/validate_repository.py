@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Run local structural checks for the narrated fable drama monorepo."""
+"""Run local structural checks without writing bytecode beside source files."""
 
 from __future__ import annotations
 
-import compileall
 from pathlib import Path
 
 from narrated_fable_drama.core.paths import ProjectPaths
-
 
 DEPARTMENTS = (
     "screenplay-writer",
@@ -19,6 +17,19 @@ DEPARTMENTS = (
 )
 
 
+def python_syntax_errors(source_root: Path) -> list[str]:
+    """Return syntax failures while keeping the source tree free of ``.pyc`` files."""
+
+    failures: list[str] = []
+    for source_path in sorted(source_root.rglob("*.py")):
+        try:
+            source = source_path.read_bytes()
+            compile(source, str(source_path), "exec")
+        except (OSError, SyntaxError, ValueError) as exc:
+            failures.append(f"{source_path}: {exc}")
+    return failures
+
+
 def main() -> int:
     paths = ProjectPaths.resolve(Path(__file__))
     missing = [
@@ -28,10 +39,11 @@ def main() -> int:
     ]
     if missing:
         raise SystemExit("Missing department Skills: " + ", ".join(missing))
-    if not compileall.compile_dir(
-        paths.repository_root / "src", quiet=1, force=False
-    ):
-        raise SystemExit("Shared Python package compilation failed.")
+    syntax_errors = python_syntax_errors(paths.repository_root / "src")
+    if syntax_errors:
+        raise SystemExit(
+            "Shared Python package syntax check failed:\n" + "\n".join(syntax_errors)
+        )
     print("repository structure: PASS")
     return 0
 

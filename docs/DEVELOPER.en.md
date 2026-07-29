@@ -39,14 +39,22 @@ python3 -m pip install 'tos>=2.9,<3'
 First confirm the repository structure and shared package are usable:
 
 ```bash
-narrated-fable-drama validate-repository
+scripts/run_python.sh -m narrated_fable_drama.cli validate-repository
 ```
 
-You can also run it directly:
+You can also run the underlying script directly:
 
 ```bash
-python3 scripts/validate_repository.py
+scripts/run_python.sh scripts/validate_repository.py
 ```
+
+Run repository Python commands through `scripts/run_python.sh`. It preserves the
+selected interpreter and all command arguments, but sets the bytecode cache
+destination to `.cache/pycache/` before Python starts. Pytest and Ruff use
+`.cache/pytest/` and `.cache/ruff/`, respectively. The entire `.cache/` directory
+is disposable, and cache directories should no longer appear throughout `src/`,
+`skills/`, `scripts/`, or `tests/`. Set `PYTHON_BIN=/path/to/python` to select an
+explicit interpreter.
 
 ## Creating a Task
 
@@ -160,11 +168,11 @@ The validation commands do not write the screenplay for Codex; both `build` and
 `check` read and validate the current `screenplay.md`:
 
 ```bash
-python3 skills/screenplay-writer/scripts/build_screenplay.py build \
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py build \
   --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/build_screenplay.py check \
+scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py check \
   --task-dir TASK_DIR
-python3 skills/screenplay-writer/scripts/character_performance_map.py \
+scripts/run_python.sh skills/screenplay-writer/scripts/character_performance_map.py \
   role-asset-scope --task-dir TASK_DIR
 ```
 
@@ -200,7 +208,7 @@ Before any Seedream call, first inspect semantic reuse and unregistered existing
 files:
 
 ```bash
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --inspect-semantic-reuse
 ```
 
@@ -208,7 +216,7 @@ Run the build after confirming reuse, regenerating, or accepting new images. The
 following parameters can be reused:
 
 ```bash
-python3 skills/direct-production-design/scripts/build_initial_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/build_initial_production_design.py \
   --task-dir TASK_DIR --max-workers 4 \
   --codex-reuse-asset TARGET_ASSET_ID=SOURCE_ASSET_ID \
   --codex-regenerate-visual-asset TARGET_ASSET_ID \
@@ -218,7 +226,7 @@ python3 skills/direct-production-design/scripts/build_initial_production_design.
 Finally validate:
 
 ```bash
-python3 skills/direct-production-design/scripts/validate_production_design.py \
+scripts/run_python.sh skills/direct-production-design/scripts/validate_production_design.py \
   --task-dir TASK_DIR
 ```
 
@@ -243,7 +251,7 @@ listener reactions, and audio/picture handoffs.
 Validate:
 
 ```bash
-python3 skills/previsualize-cinematography/scripts/validate_storyboard.py \
+scripts/run_python.sh skills/previsualize-cinematography/scripts/validate_storyboard.py \
   --task-dir TASK_DIR
 ```
 
@@ -268,7 +276,7 @@ You must finish all first-version prompts before running the full validation
 without the `--segments` parameter:
 
 ```bash
-python3 skills/virtual-production/scripts/validate_segment_scripts.py validate \
+scripts/run_python.sh skills/virtual-production/scripts/validate_segment_scripts.py validate \
   --task-dir TASK_DIR
 ```
 
@@ -286,7 +294,7 @@ is per-segment video generation allowed.
 Preflight the current segment before generating:
 
 ```bash
-python3 skills/virtual-production/scripts/preflight_segment.py \
+scripts/run_python.sh skills/virtual-production/scripts/preflight_segment.py \
   --task-dir TASK_DIR --segment segment-NNN
 ```
 
@@ -295,7 +303,7 @@ conversation, the generation command must provide both the target segment and th
 ephemeral human-confirmation assertion:
 
 ```bash
-python3 skills/virtual-production/scripts/generate_segment_videos.py \
+scripts/run_python.sh skills/virtual-production/scripts/generate_segment_videos.py \
   --task-dir TASK_DIR \
   --segments segment-NNN \
   --human-confirmed-segment segment-NNN
@@ -329,7 +337,7 @@ Once every current Segment has an accepted `video.mp4` and a matching
 generate real media evidence:
 
 ```bash
-python3 skills/finish-postproduction/scripts/inspect_finish_media.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/inspect_finish_media.py \
   --task-dir TASK_DIR
 ```
 
@@ -343,7 +351,7 @@ TASK_DIR/.pending/finish-postproduction/llm-repair-plan.json
 Validate the repair plan:
 
 ```bash
-python3 skills/finish-postproduction/scripts/validate_repair_plan.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/validate_repair_plan.py \
   --task-dir TASK_DIR \
   --evidence-manifest \
     TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
@@ -355,7 +363,7 @@ render short candidate clips and inspect them manually; do not let the script
 decide creative repairs automatically. Finally execute:
 
 ```bash
-python3 skills/finish-postproduction/scripts/finish_postproduction.py \
+scripts/run_python.sh skills/finish-postproduction/scripts/finish_postproduction.py \
   --task-dir TASK_DIR \
   --evidence-manifest \
     TASK_DIR/.pending/finish-postproduction/llm-evidence/evidence-manifest.json \
@@ -512,9 +520,9 @@ immediately.
 Safely inspect configuration status without printing secrets:
 
 ```bash
-python3 -m narrated_fable_drama.providers.seedream --pretty config
-python3 -m narrated_fable_drama.providers.seedance --pretty config
-python3 -m narrated_fable_drama.providers.seedaudio --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedream --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedance --pretty config
+scripts/run_python.sh -m narrated_fable_drama.providers.seedaudio --pretty config
 ```
 
 Remote access is only allowed through `src/narrated_fable_drama/providers/`.
@@ -553,15 +561,15 @@ Run the test closest to your change first, then the full unit tests and structur
 check:
 
 ```bash
-python3 -m pytest tests/unit/test_relevant_file.py -q
-python3 -m pytest tests/unit -q
-python3 scripts/validate_repository.py
+scripts/run_python.sh -m pytest tests/unit/test_relevant_file.py -q
+scripts/run_python.sh -m pytest tests/unit -q
+scripts/run_python.sh scripts/validate_repository.py
 ```
 
 The code style configuration lives in `pyproject.toml`:
 
 ```bash
-python3 -m ruff check src skills scripts tests
+scripts/run_python.sh -m ruff check src skills scripts tests
 ```
 
 For repository locating and searching, follow `AGENTS.md`: first narrow the scope

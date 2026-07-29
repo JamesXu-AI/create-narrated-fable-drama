@@ -109,9 +109,9 @@ workspace/tasks/<task>/story.md
 - 先运行最窄验证，再扩大：
 
   ```bash
-  python3 -m pytest tests/unit/test_relevant_file.py -q
-  python3 -m pytest tests/unit -q
-  python3 scripts/validate_repository.py
+  scripts/run_python.sh -m pytest tests/unit/test_relevant_file.py -q
+  scripts/run_python.sh -m pytest tests/unit -q
+  scripts/run_python.sh scripts/validate_repository.py
   ```
 
 - 涉及阶段产物时，使用对应部门脚本的校验命令；常用入口见 `README.md` 的

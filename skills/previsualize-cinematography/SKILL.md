@@ -95,7 +95,7 @@ cannot deactivate a positive image reference.
 10. Validate:
 
 ```text
-python3 skills/previsualize-cinematography/scripts/validate_storyboard.py \
+scripts/run_python.sh skills/previsualize-cinematography/scripts/validate_storyboard.py \
   --task-dir TASK_DIR
 ```
 
