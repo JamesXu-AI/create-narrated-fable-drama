@@ -102,14 +102,18 @@ review, and final edit:
 1. Require `story.md` and known target country.
 2. Execute `screenplay-writer`. Require a valid complete `screenplay.md` and a
    full speech-rate PASS with exact speech, delivery modes, natural transitions,
-   and separate framing/embedded story worlds.
+   separate framing/embedded story worlds, and a selective Story Objects registry
+   with exact physical ownership and visual-control facts.
 3. Run the role/asset scope gate, then execute `direct-production-design`.
    Before generating any visual, require its asset-library discovery gate to
    inspect repository-root `workspace/assets/assets.json` and
    `workspace/assets/`; a missing catalog ID never proves that media is absent.
+   Require one validated visual-authority route for every registered Story Object;
+   the role-reference baseline never waives a required object authority.
 4. Execute `previsualize-cinematography`. Release only `storyboard.md` and require
    its complete speech-window rate and close-up/eyeline visual-grammar gates to
-   pass.
+   pass, including exact-Shot binding of every approved Story Object image
+   authority.
 5. Execute `virtual-production`. Author every first-pass `segment-NNN.md` directly
    from the Storyboard, then require the complete Prompt-set and speech-rate gate
    to pass, including copied visible-character economy, eyeline axis, per-Shot

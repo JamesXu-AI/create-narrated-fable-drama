@@ -100,6 +100,7 @@ def build_or_check(task_dir: Path, *, check_only: bool) -> dict[str, Any]:
         "dialogue_cue_count": dialogue_count,
         "speech_rate_gate": screenplay_speech_rate_gate(screenplay),
         "performance_entity_count": len(performance["performance_entities"]),
+        "story_object_count": len(screenplay["story_objects"]),
     }
 
 

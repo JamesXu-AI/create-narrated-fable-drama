@@ -180,7 +180,7 @@ def _performance() -> dict[str, object]:
 
 def _plan() -> dict[str, object]:
     return {
-        "contract": "production-design-plan",
+        "contract": "production-design-plan/v2",
         "characters": [
             _character("speaker", speaks=True),
             _character("silent-guide", speaks=False),
@@ -202,6 +202,7 @@ def _plan() -> dict[str, object]:
                 "generation_prompt": _visual_prompt("ensemble_roster"),
             }
         ],
+        "object_authorities": [],
         "props": [],
         "costumes": [],
         "locations": [
@@ -234,6 +235,56 @@ def _plan() -> dict[str, object]:
     }
 
 
+def _screenplay(
+    story_objects: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    return {
+        "production_information": {"Visual Style": "3D Healing Animation"},
+        "scenes": [{"scene_id": "scene-001"}],
+        "story_objects": list(story_objects or []),
+    }
+
+
+def _story_object(
+    *,
+    triggers: list[str],
+    owner_kind: str = "independent",
+    owner_id: str | None = None,
+    object_id: str = "object-001",
+) -> dict[str, object]:
+    return {
+        "object_id": object_id,
+        "name_en": "A generic authored story object",
+        "story_function_en": "Supports one visible story action.",
+        "scene_ids": ["scene-001"],
+        "segment_ids": ["segment-001"],
+        "physical_owner_kind": owner_kind,
+        "physical_owner_id": owner_id,
+        "visual_control_triggers": triggers,
+        "visual_authority_shot_ids": ["A-001"] if triggers else [],
+        "state_facts_en": (
+            "Changes from its opening state to a settled result."
+            if "state_change" in triggers
+            else "none"
+        ),
+        "identity_facts_en": (
+            "Keeps one distinctive shape and material."
+            if "distinctive_identity" in triggers
+            else "none"
+        ),
+    }
+
+
+def _prop(asset_id: str) -> dict[str, object]:
+    return {
+        "type": "prop",
+        "asset_id": asset_id,
+        "description_en": "One reusable generic story prop.",
+        "media_path": f"workspace/assets/props/{asset_id}/identity.png",
+        "generation_prompt": _visual_prompt("prop"),
+    }
+
+
 class RoleKindClassificationTests(unittest.TestCase):
     def test_budget_uses_kind_not_speech(self) -> None:
         budget = _role_visual_type_budget(_performance()["performance_entities"])
@@ -243,10 +294,7 @@ class RoleKindClassificationTests(unittest.TestCase):
 
     def test_silent_individual_is_a_character_without_voice(self) -> None:
         performance = _performance()
-        screenplay = {
-            "production_information": {"Visual Style": "3D Healing Animation"},
-            "scenes": [{"scene_id": "scene-001"}],
-        }
+        screenplay = _screenplay()
         with tempfile.TemporaryDirectory() as temporary:
             task_root = Path(temporary)
             plan_path = (
@@ -301,10 +349,7 @@ class RoleKindClassificationTests(unittest.TestCase):
 
     def test_omitting_silent_individual_is_rejected(self) -> None:
         performance = _performance()
-        screenplay = {
-            "production_information": {"Visual Style": "3D Healing Animation"},
-            "scenes": [{"scene_id": "scene-001"}],
-        }
+        screenplay = _screenplay()
         plan = _plan()
         plan["characters"] = [plan["characters"][0]]
         with tempfile.TemporaryDirectory() as temporary:
@@ -325,6 +370,212 @@ class RoleKindClassificationTests(unittest.TestCase):
                     performance=performance,
                     screenplay=screenplay,
                 )
+
+    def test_prompt_only_is_allowed_for_uncontrolled_independent_object(self) -> None:
+        plan = _plan()
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "segment_prompt_only",
+                "asset_ids": [],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            parsed = load_production_design_plan(
+                task_root,
+                performance=_performance(),
+                screenplay=_screenplay([_story_object(triggers=[])]),
+            )
+        self.assertEqual(
+            parsed["object_authorities"][0]["mode"],
+            "segment_prompt_only",
+        )
+
+    def test_visual_control_trigger_requires_dedicated_asset(self) -> None:
+        plan = _plan()
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "segment_prompt_only",
+                "asset_ids": [],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            with self.assertRaisesRegex(
+                ProductionDesignPlanError,
+                "must be dedicated_asset",
+            ):
+                load_production_design_plan(
+                    task_root,
+                    performance=_performance(),
+                    screenplay=_screenplay(
+                        [_story_object(triggers=["distinctive_identity"])]
+                    ),
+                )
+
+    def test_dedicated_prop_must_trace_to_story_object(self) -> None:
+        plan = _plan()
+        plan["props"] = [_prop("prop-controlled")]
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "dedicated_asset",
+                "asset_ids": ["prop-controlled"],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            parsed = load_production_design_plan(
+                task_root,
+                performance=_performance(),
+                screenplay=_screenplay(
+                    [_story_object(triggers=["interaction_geometry"])]
+                ),
+            )
+        self.assertEqual(
+            parsed["object_authorities"][0]["asset_ids"],
+            ["prop-controlled"],
+        )
+
+    def test_owner_asset_can_cover_non_dedicated_object(self) -> None:
+        plan = _plan()
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "covered_by_asset",
+                "asset_ids": ["speaker"],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            parsed = load_production_design_plan(
+                task_root,
+                performance=_performance(),
+                screenplay=_screenplay(
+                    [
+                        _story_object(
+                            triggers=[],
+                            owner_kind="character",
+                            owner_id="speaker",
+                        )
+                    ]
+                ),
+            )
+        self.assertEqual(
+            parsed["object_authorities"][0]["mode"],
+            "covered_by_asset",
+        )
+
+    def test_controlled_child_is_promoted_when_parent_has_no_asset(self) -> None:
+        plan = _plan()
+        plan["props"] = [_prop("prop-controlled-child")]
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "segment_prompt_only",
+                "asset_ids": [],
+            },
+            {
+                "object_id": "object-002",
+                "mode": "dedicated_asset",
+                "asset_ids": ["prop-controlled-child"],
+            },
+        ]
+        parent = _story_object(triggers=[])
+        child = _story_object(
+            object_id="object-002",
+            triggers=["distinctive_identity"],
+            owner_kind="object",
+            owner_id="object-001",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            parsed = load_production_design_plan(
+                task_root,
+                performance=_performance(),
+                screenplay=_screenplay([parent, child]),
+            )
+        self.assertEqual(
+            parsed["object_authorities"][1]["mode"],
+            "dedicated_asset",
+        )
+
+    def test_uncontrolled_child_follows_prompt_only_parent(self) -> None:
+        plan = _plan()
+        plan["object_authorities"] = [
+            {
+                "object_id": "object-001",
+                "mode": "segment_prompt_only",
+                "asset_ids": [],
+            },
+            {
+                "object_id": "object-002",
+                "mode": "segment_prompt_only",
+                "asset_ids": [],
+            },
+        ]
+        parent = _story_object(triggers=[])
+        child = _story_object(
+            object_id="object-002",
+            triggers=[],
+            owner_kind="object",
+            owner_id="object-001",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            task_root = Path(temporary)
+            plan_path = (
+                task_root
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            parsed = load_production_design_plan(
+                task_root,
+                performance=_performance(),
+                screenplay=_screenplay([parent, child]),
+            )
+        self.assertEqual(
+            parsed["object_authorities"][1]["mode"],
+            "segment_prompt_only",
+        )
 
 
 if __name__ == "__main__":

@@ -254,6 +254,13 @@ purpose stated in natural language. `Asset Namespace` is internal runtime mappin
 `Readable Subject` is the human-facing character, place, prop, or voice name virtual production
 must use. A token may be repeated only when it has genuinely separate purposes.
 
+For every screenplay Story Object `Visual Authority Shot ID`, read its
+production-design `object_authorities` entry and bind every named image asset with
+`Shot Scope` covering the internal Ordered Shot that executes that screenplay
+Shot. A Location, character, costume, or parent-prop authority is valid only when
+production design explicitly selected it. A `segment_prompt_only` object receives
+no asset binding. Do not bind all catalog props to every Segment.
+
 The Location token owns the dressed set and its production-design-approved embedded
 NPC population. Do not bind those NPC assets again. Bind every required
 `independent_performer_asset_ids` character or ensemble separately for identity,
@@ -438,6 +445,9 @@ Accept only when:
   token, puts the most identity-critical declaration first, normally stays within
   four or five references, and never independently references more than four
   performers;
+- every Story Object Visual Authority Shot binds all of its approved covering
+  image assets at the exact internal Shot scope, while Prompt-only and unrelated
+  objects remain unbound;
 - every Segment appears once in the Location State Plan;
 - every Segment supplies Location-owned world/population evidence; every
   continuing or revisited location also names the latest earlier source in the

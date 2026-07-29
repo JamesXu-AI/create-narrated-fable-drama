@@ -40,7 +40,8 @@ before authoring.
 
 Own story-faithful dramatic adaptation, exact speech, delivery mode, natural speech
 transition, character objectives, visible action and reaction, staging, gaze,
-framing/embedded-world separation, sound events, timing, and continuity.
+framing/embedded-world separation, sound events, timing, continuity, and the
+story-object facts that may require downstream visual authority.
 
 Do not choose asset IDs, appearance design, detailed cinematography, provider
 parameters, Storyboard implementation, or Seedance Prompt wording.
@@ -118,8 +119,12 @@ needing the same positive character image both present and absent.
    listener response, and changed state.
 9. Use Continuity Boundary `Audio Handoff` cells to carry exact J/L cuts, breaths,
    ambience crossfades, and returns between narrative layers.
-10. Keep project-wide visual role types at eight or fewer.
-11. Run:
+10. Register only story-relevant objects that are causal, recurring,
+    state-changing, interaction-sensitive, detail-bearing, or identity-critical.
+    Record their physical owner, exact visual-control triggers, authority Shots,
+    state facts, and identity facts without choosing downstream asset IDs.
+11. Keep project-wide visual role types at eight or fewer.
+12. Run:
 
 ```text
 scripts/run_python.sh skills/screenplay-writer/scripts/build_screenplay.py build --task-dir TASK_DIR
@@ -128,9 +133,9 @@ scripts/run_python.sh skills/screenplay-writer/scripts/character_performance_map
   --task-dir TASK_DIR
 ```
 
-12. Require `speech_rate_gate.status=PASS` for the complete screenplay. A fast
+13. Require `speech_rate_gate.status=PASS` for the complete screenplay. A fast
     line must be shortened or given more Shot time before downstream work.
-13. Reread the screenplay as one film. Validator success does not prove that a
+14. Reread the screenplay as one film. Validator success does not prove that a
     speech transition feels natural.
 
 Release only after all checks pass and the screenplay has no filler, speaker

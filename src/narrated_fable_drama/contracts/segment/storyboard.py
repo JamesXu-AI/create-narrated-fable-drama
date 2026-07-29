@@ -392,7 +392,8 @@ def storyboard_segment_rows(
                 "wider framing only for a labeled position-change exception; "
                 "preserve exact speakers, voice identity, mouth behavior, "
                 "natural speech transitions, references, continuity, and native audio; "
-                "no generated subtitles or on-screen text."
+                "no generated subtitles or on-screen transcription; natural readable "
+                "English on-screen text is allowed."
             ),
             "visible_character_economy_en": direction.get(
                 "Visible Character Economy", ""
@@ -411,7 +412,8 @@ def storyboard_segment_rows(
             "dialogue_delimiter": "{}",
             "music_delimiter": "()",
             "sound_effect_delimiter": "<>",
-            "subtitle_delimiter": "【】",
+            "on_screen_text_delimiter": "【】",
+            "generated_on_screen_text_policy": "natural_readable_english_allowed",
             "background_music_policy": "parentheses_only",
             "generated_subtitle_policy": "forbidden",
             "avoid_precise_time_ranges": True,

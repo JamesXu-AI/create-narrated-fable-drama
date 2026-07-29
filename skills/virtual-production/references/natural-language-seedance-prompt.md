@@ -97,17 +97,20 @@ Temporal evidence owns recent action and position, not identity. A role marked
 - exact speech: `{spoken words}`
 - effect: `<source and audible event>`
 - restrained native music: `(music cue)`
-- generated on-screen text: `【text】`
+- explicitly authored English on-screen text: `【text】`
 
-This production forbids generated on-screen text; subtitles are added after
-picture lock. Seedance generates synchronized speech, narration, ambience,
-effects, and restrained music natively.
+This production allows natural, readable English on-screen text, whether authored
+with `【text】` or arising incidentally from the scene. Generated captions and
+on-screen transcription remain forbidden; subtitles are added after picture lock.
+Seedance generates synchronized speech, narration, ambience, effects, and
+restrained music natively.
 
 ## Final constraints
 
 Forbid paraphrase, omission, repetition, added words, wrong speaker, wrong mouth
-movement, voice replacement, captions, visible text, logos, watermarks, duplicate
-people, clones, decorative bystanders, unauthorized full-cast composition,
-ambiguous or reversed eyelines, unmotivated widening, anatomy errors,
-identity/style/costume drift, unmotivated appearance or disappearance, and
-discontinuous light, space, props, or ambience.
+movement, voice replacement, captions, on-screen transcription, unreadable
+pseudo-writing, scene-contradictory text, logos, watermarks, duplicate people,
+clones, decorative bystanders, unauthorized full-cast composition, ambiguous or
+reversed eyelines, unmotivated widening, anatomy errors, identity/style/costume
+drift, unmotivated appearance or disappearance, and discontinuous light, space,
+props, or ambience. Natural readable English scene text is allowed.

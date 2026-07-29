@@ -23,6 +23,14 @@ def _prompt_dialogue_blocks(text: str) -> list[str]:
     return re.findall(r"\{([^{}]+)\}", text)
 
 
+def _validate_on_screen_text(prompt: str, segment_id: str) -> None:
+    stripped = re.sub(r"【[^【】]+】", "", prompt)
+    if "【" in stripped or "】" in stripped:
+        raise SegmentRuntimeError(
+            f"{segment_id} Prompt has malformed on-screen text delimiters"
+        )
+
+
 def _validate_visual_doctrine(prompt: str, row: dict[str, Any]) -> None:
     contract = row["prompt_contract"]
     required_declarations = {
@@ -98,10 +106,7 @@ def _validate_prompt(text: str, row: dict[str, Any], path: Path) -> str:
             f"{row['segment_id']} Prompt must name the exact approved Visual Style "
             f"{row['visual_style']!r}"
         )
-    if "【" in prompt or "】" in prompt:
-        raise SegmentRuntimeError(
-            f"{row['segment_id']} Prompt requests generated subtitles or text"
-        )
+    _validate_on_screen_text(prompt, row["segment_id"])
     _validate_visual_doctrine(prompt, row)
     dialogue_blocks = _prompt_dialogue_blocks(prompt)
     for cue in row["dialogue_cues"]:

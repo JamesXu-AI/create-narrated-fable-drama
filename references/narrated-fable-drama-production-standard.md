@@ -39,6 +39,10 @@ story, performance, speech, camera, or continuity authority.
   authored music are generated as synchronized Seedance-native audio.
 - Generated subtitles and on-screen transcription are forbidden. Captions belong
   to postproduction.
+- Natural, readable English words, labels, signs, notes, and other scene-native
+  text are allowed in generated video. Their presence alone is never a review
+  failure; reject only unreadable pseudo-writing or text that contradicts the
+  scene.
 - Postproduction captions copy exact text and speaker order from the Storyboard,
   but derive their final appearance times from word-level alignment against the
   completed clean master's native audio. Missing or low-coverage alignment blocks
@@ -178,8 +182,12 @@ reference requirements conflict.
 
 - `screenplay-writer` authors the complete drama, exact speech, delivery modes,
   natural speech transitions, framing/embedded-world separation, and state changes.
-- `direct-production-design` supplies reusable character, voice, prop, costume, and
-  Location assets without inventing narrative functions.
+- `direct-production-design` routes every screenplay-registered story object to a
+  dedicated asset, an approved Location/character/costume/parent-asset authority,
+  or Segment-Prompt-only treatment; it supplies reusable character, voice, prop,
+  costume, and Location assets without inventorying nouns or inventing narrative
+  functions. A controlled child object cannot inherit from a Prompt-only parent;
+  it is promoted to dedicated image authority.
 - `previsualize-cinematography` turns the screenplay into one executable
   `storyboard.md`, including every speech handoff, mouth state, listener reaction,
   audio bridge, reference inclusion, and reference omission.

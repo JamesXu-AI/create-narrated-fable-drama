@@ -58,8 +58,10 @@ mouth moves. Reverse the handoff just as explicitly when narration returns.
 
 Seedance produces synchronized dialogue, storytelling, effects, ambience, and
 restrained music. Describe voice audibly—age, texture, pitch, weight, pace, and
-energy—and bind approved voice media when available. Generated captions are
-forbidden; postproduction uses exact Storyboard cue timing.
+energy—and bind approved voice media when available. Natural readable English
+words, labels, signs, and notes are allowed in the scene. Generated captions and
+on-screen transcription are forbidden; postproduction uses exact Storyboard cue
+timing.
 
 ## Extension safeguards
 
@@ -73,7 +75,9 @@ without predecessor media.
 
 Reject wrong speaker, wrong mouth movement, narrator voice replacement, unnatural
 dialogue-to-narration switching, clipped lines, paraphrase, duplicate subjects,
-identity drift, text, logos, watermarks, continuity jumps, extension replay,
+identity drift, unreadable pseudo-writing or scene-contradictory text, generated
+captions/transcription, logos, watermarks, continuity jumps, extension replay,
 missing ambience bridges, decorative/extra characters, crowded full-cast staging,
 ambiguous or reversed eyelines, lost close-up dominance, an unearned wider view,
-or progressive quality degradation.
+or progressive quality degradation. Natural readable English scene text is
+allowed and is not independently a failure.

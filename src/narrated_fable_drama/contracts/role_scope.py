@@ -513,6 +513,10 @@ def role_asset_scope_gate(task_dir: Path) -> dict[str, Any]:
                 "static_reference_image_count": 1
                 + len(individual_ids)
                 + len(ensemble_roles),
+                "static_reference_image_count_scope": (
+                    "Baseline Location plus role identities only; Story Object "
+                    "visual authorities are planned separately by production design."
+                ),
             }
         )
     environment_by_scene = {
@@ -616,4 +620,3 @@ def load_character_performance_map(task_dir: Path) -> dict[str, Any]:
         screenplay_path=path,
     )
     return value
-

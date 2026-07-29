@@ -206,6 +206,26 @@ class CloseupVisualDoctrineTests(unittest.TestCase):
         )
         self.assertIn("Shot 2: close_up.", validated)
 
+    def test_segment_prompt_allows_authored_english_on_screen_text(self) -> None:
+        validated = _validate_prompt(
+            _prompt(include_wide_exception=True)
+            + "\nA small sign contains 【MOON PLAY】.",
+            _prompt_row(),
+            Path("segment-001.md"),
+        )
+        self.assertIn("【MOON PLAY】", validated)
+
+    def test_segment_prompt_rejects_malformed_on_screen_text(self) -> None:
+        with self.assertRaisesRegex(
+            SegmentRuntimeError, "malformed on-screen text delimiters"
+        ):
+            _validate_prompt(
+                _prompt(include_wide_exception=True)
+                + "\nA small sign contains 【MOON PLAY.",
+                _prompt_row(),
+                Path("segment-001.md"),
+            )
+
     def test_storyboard_wide_requires_literal_position_change_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             task_dir = Path(temporary)

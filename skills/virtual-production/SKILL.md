@@ -58,6 +58,8 @@ The Segment Prompt is the complete instruction Seedance sees. It must:
   narration, effects, ambience, and restrained music;
 - state the screenplay's exact approved Visual Style; resolution is supplied as
   the selected provider parameter and defaults to 1080p only when not overridden;
+- allow natural, readable English words, labels, signs, and notes in the scene;
+  never reject or suppress them merely because they are visible text; and
 - forbid generated captions, paraphrased speech, duplicate characters, identity
   drift, decorative bystanders, unauthorized full-cast composition, reversed or
   ambiguous eyelines, unmotivated widening, unexplained

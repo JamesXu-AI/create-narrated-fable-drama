@@ -43,6 +43,9 @@ from narrated_fable_drama.contracts.screenplay.schema import (
     concrete as _concrete,
     present as _present,
 )
+from narrated_fable_drama.contracts.story_objects import (
+    VISUAL_CONTROL_TRIGGERS,
+)
 
 
 TITLE_RE = re.compile(r"^# Cinematic Widescreen Production Script: (.+)$")
@@ -51,6 +54,7 @@ SCENE_ID_RE = re.compile(r"^scene-[0-9]{3,}$")
 ENTITY_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 ACTION_ID_RE = re.compile(r"^A-[0-9]{3,}$")
 LINE_ID_RE = re.compile(r"^L-[0-9]{3,}$")
+OBJECT_ID_RE = re.compile(r"^object-[0-9]{3,}$")
 GAZE_RE = re.compile(
     r"^([a-z0-9]+(?:-[a-z0-9]+)*) -> ([^()]+?) "
     r"\(facing=(.+?), gaze=(.+)\)$"
@@ -180,6 +184,18 @@ CHARACTER_SCENE_STATE_TABLE_COLUMNS = (
     "Position, Injury and Condition",
     "Transition Cause",
     "Outgoing Diegetic Presence",
+)
+STORY_OBJECT_TABLE_COLUMNS = (
+    "Object ID",
+    "Object",
+    "Story Function",
+    "Scene IDs",
+    "Segment IDs",
+    "Physical Owner",
+    "Visual Control Triggers",
+    "Visual Authority Shot IDs",
+    "State Facts",
+    "Identity Facts",
 )
 CONTINUITY_STATE_TABLE_COLUMNS = (
     "State ID",
@@ -313,6 +329,36 @@ def _yes_no(value: str, *, label: str) -> bool:
     if value not in {"yes", "no"}:
         raise StoryVideoError(f"{label} must be yes or no")
     return value == "yes"
+
+
+def _visual_control_triggers(value: str, *, label: str) -> list[str]:
+    if value == "none":
+        return []
+    result = [item.strip() for item in value.split(",")]
+    if (
+        not result
+        or any(item not in VISUAL_CONTROL_TRIGGERS for item in result)
+        or len(result) != len(set(result))
+    ):
+        raise StoryVideoError(
+            f"{label} must use unique approved visual-control trigger codes"
+        )
+    return result
+
+
+def _physical_owner(value: str, *, label: str) -> tuple[str, str | None]:
+    if value == "independent":
+        return "independent", None
+    match = re.fullmatch(
+        r"(environment|character|object):([a-z0-9]+(?:-[a-z0-9]+)*)",
+        value,
+    )
+    if match is None:
+        raise StoryVideoError(
+            f"{label} must be independent, environment:<id>, character:<id>, "
+            "or object:<id>"
+        )
+    return match.group(1), match.group(2)
 
 
 def _positive_number(value: str, *, label: str) -> float:
@@ -690,6 +736,52 @@ def parse_screenplay_markdown(text: str) -> dict[str, Any]:
         for row in rows
     ]
 
+    index = _expect_heading(lines, index, "### Story Objects")
+    rows, index = _parse_table(
+        lines,
+        index,
+        columns=STORY_OBJECT_TABLE_COLUMNS,
+        label="Story Objects table",
+        allow_empty=True,
+    )
+    story_objects: list[dict[str, Any]] = []
+    for row in rows:
+        owner_kind, owner_id = _physical_owner(
+            row["Physical Owner"],
+            label=f"{row['Object ID']} Physical Owner",
+        )
+        story_objects.append(
+            {
+                "object_id": row["Object ID"],
+                "name_en": row["Object"],
+                "story_function_en": row["Story Function"],
+                "scene_ids": _ids(
+                    row["Scene IDs"],
+                    SCENE_ID_RE,
+                    label=f"{row['Object ID']} Scene IDs",
+                ),
+                "segment_ids": _ids(
+                    row["Segment IDs"],
+                    SEGMENT_ID_RE,
+                    label=f"{row['Object ID']} Segment IDs",
+                ),
+                "physical_owner_kind": owner_kind,
+                "physical_owner_id": owner_id,
+                "visual_control_triggers": _visual_control_triggers(
+                    row["Visual Control Triggers"],
+                    label=f"{row['Object ID']} Visual Control Triggers",
+                ),
+                "visual_authority_shot_ids": _ids(
+                    row["Visual Authority Shot IDs"],
+                    ACTION_ID_RE,
+                    label=f"{row['Object ID']} Visual Authority Shot IDs",
+                    allow_none=True,
+                ),
+                "state_facts_en": row["State Facts"],
+                "identity_facts_en": row["Identity Facts"],
+            }
+        )
+
     index = _expect_heading(lines, index, "### Continuity States")
     rows, index = _parse_table(
         lines,
@@ -811,6 +903,7 @@ def parse_screenplay_markdown(text: str) -> dict[str, Any]:
         "scenes": scenes,
         "scene_dramatic_contracts": scene_contracts,
         "character_scene_states": character_scene_states,
+        "story_objects": story_objects,
         "continuity_states": continuity_states,
         "continuity_boundaries": continuity_boundaries,
         "segments": segments,

@@ -131,6 +131,12 @@ def validate_task(task_dir: Path) -> dict[str, object]:
         "asset_count": len(catalog["assets"]),
         "individual_character_count": len(plan["characters"]),
         "anonymous_ensemble_count": anonymous_ensemble_count,
+        "story_object_authority_count": len(plan["object_authorities"]),
+        "dedicated_story_object_count": sum(
+            item["mode"] == "dedicated_asset"
+            for item in plan["object_authorities"]
+        ),
+        "prop_asset_count": len(plan["props"]),
         "speaker_voice_count": voice_result["speaker_count"],
         "location_master_count": len(plan["locations"]),
         "aesthetic_reference_frame_count": (

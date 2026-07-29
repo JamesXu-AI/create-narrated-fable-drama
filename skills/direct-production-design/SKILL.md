@@ -74,6 +74,39 @@ This JSON is visual-asset authority only. It may define reusable identity, body
 topology, voice description, props, costumes, Locations, media paths, and image
 generation prompts. It may not duplicate or reinterpret narration mode, exact
 speech, speech transitions, Shot presence, camera, or edit.
+Its root `contract` value is exactly `production-design-plan/v2`.
+
+For every screenplay `Story Objects` row, author one ordered
+`object_authorities` entry:
+
+```json
+{
+  "object_id": "object-NNN",
+  "mode": "dedicated_asset | covered_by_asset | segment_prompt_only",
+  "asset_ids": []
+}
+```
+
+This is visual-authority routing, not forced asset generation:
+
+- use `dedicated_asset` when an independent object has any visual-control trigger,
+  or when any object requires `detail_view`, `state_change`, or
+  `interaction_geometry`;
+- use `covered_by_asset` when a non-independent object needs no dedicated asset and
+  its approved Location, character/costume, or previously declared parent prop
+  already owns the required look; and
+- use `segment_prompt_only` only for an independent object with no visual-control
+  triggers, or for a trigger-free component whose parent is also Prompt-only.
+
+If a component has visual-control triggers but its parent resolves to
+`segment_prompt_only`, promote the component to `dedicated_asset`: a prose-only
+parent cannot provide positive image authority.
+
+Do not create a prop for every noun. Every independent prop must trace to one
+Story Object, and reference-budget recommendations never justify omitting a
+required dedicated authority. Asset creation and per-Segment binding are separate
+decisions. The role-scope gate's `static_reference_image_count` is only a baseline
+Location-plus-role count and never decides whether a Story Object needs authority.
 
 Every visual asset Prompt uses the screenplay's exact `Visual Style`. When the
 conversation did not override it, that value is `3D Healing Animation`. Character

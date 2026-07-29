@@ -25,7 +25,7 @@ alter creative content.
 2. `## Production Information` table;
 3. `## Characters` table;
 4. `## Script` with consecutive Scene Unit sections;
-5. `## Continuity Appendix` tables.
+5. `## Continuity Appendix` tables, including `Story Objects`.
 
 Use globally consecutive IDs: `segment-001`, `scene-001`, `state-001`,
 `boundary-001`, `A-001`, and `L-001`.
@@ -391,6 +391,56 @@ row and its incoming presence equals that source's outgoing presence. A new came
 close-up, generation limit, reference budget, or stability preference is never an
 exit. Only the screenplay or an explicit user revision may relax a required
 visibility row.
+
+### Story Objects
+
+Use:
+
+```text
+Object ID | Object | Story Function | Scene IDs | Segment IDs | Physical Owner | Visual Control Triggers | Visual Authority Shot IDs | State Facts | Identity Facts
+```
+
+This is a selective registry of story-relevant visual objects, not a noun,
+furniture, or set-dressing inventory. Add a row when the object is causal,
+recurring, state-changing, interaction-sensitive, detail-bearing, or
+identity-critical. Use consecutive `object-001`, `object-002`, ... IDs.
+
+`Physical Owner` is exactly one of:
+
+```text
+independent
+environment:<environment-id>
+character:<entity-id>
+object:<earlier-object-id>
+```
+
+It records physical containment or inseparability, not an asset decision. A held
+or transferable object is `independent`; `character:` is reserved for an object
+whose required look is inseparable from the character, such as a worn appearance.
+`object:` is reserved for a component whose look may be covered by a previously
+declared parent object.
+
+`Visual Control Triggers` is `none` or an ordered, unique comma-separated subset
+of:
+
+```text
+recurring_identity
+detail_view
+state_change
+interaction_geometry
+distinctive_identity
+```
+
+`Visual Authority Shot IDs` is `none` exactly when triggers are `none`; otherwise
+it contains exact authored Shot IDs inside the listed Segments. Use only Shots in
+which stable positive visual authority is necessary. Multi-Segment use requires
+`recurring_identity`. `state_change` requires concrete `State Facts`, otherwise
+State Facts is `none`. `distinctive_identity` requires concrete `Identity Facts`,
+otherwise Identity Facts is `none`.
+
+Objects that are generic, one-off, non-detailed, non-stateful, and safe to create
+from Segment prose may be registered with `none` triggers when they still carry a
+story function. Ordinary background nouns and decoration are omitted entirely.
 
 ### Continuity States
 

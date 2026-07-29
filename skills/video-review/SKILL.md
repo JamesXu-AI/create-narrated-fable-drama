@@ -77,8 +77,14 @@ For generated video, watch the full clip at normal speed with sound. Check:
 - close-ups remain the dominant experience; any wider interval exists only long
   enough to read the authored entrance, exit, crossing, approach, retreat,
   mark-transfer, or other consequential position change, then returns tight;
-- no paraphrase, missing/extra words, clipped speech, voice mismatch, text,
-  captions, logo, watermark, anatomy defect, or extension replay appears.
+- no paraphrase, missing/extra words, clipped speech, voice mismatch, generated
+  captions/on-screen transcription, unreadable pseudo-writing,
+  scene-contradictory text, logo, watermark, anatomy defect, or extension replay
+  appears.
+
+Natural, readable English words, labels, signs, notes, and other scene-native text
+are allowed. Do not report or reject a generated video solely because English text
+appears.
 
 Run the repository voice-identity evidence gate for every completed Segment that
 contains speech. A technical `FAIL`, missing voice reference, unreadable audio, or

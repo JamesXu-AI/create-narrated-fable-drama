@@ -113,8 +113,7 @@ writing the provider Prompt itself:
 - dialogue becomes `{exact spoken words}`;
 - music becomes `(audible music cue)` when the project's audio policy permits it;
 - sound effects become `<audible source and event>`;
-- generated on-screen text or subtitles become `【exact text】` only when explicitly
-  authorized.
+- explicitly authored English on-screen text becomes `【exact text】`.
 
 Keep one dialogue language within a Segment except for approved proper nouns. For
 hard Chinese pronunciations, retain story text in authority files and place an
@@ -126,8 +125,10 @@ pitch, weight, texture, pace, energy, and delivery should agree with the line.
 
 This project's default main flow permits and requires Seedance-native background
 music, so every Segment plans at least one intentional music cue in readable prose.
-Keep it subordinate to dialogue and important effects. Generated subtitles remain
-disabled; final captions are authored in postproduction.
+Keep it subordinate to dialogue and important effects. Natural readable English
+text may also arise incidentally in the scene and is allowed. Generated subtitles
+and on-screen transcription remain disabled; final captions are authored in
+postproduction.
 
 ## Close the Prompt with one global constraint block
 
@@ -135,7 +136,7 @@ Require downstream compilation to close the provider Prompt with one global bloc
 do not write that block as a separate previsualization artifact. The block must
 prohibit:
 
-- unrequested text or subtitles;
+- generated captions, on-screen transcription, and unreadable pseudo-writing;
 - logos and watermarks;
 - duplicate people, clones, twin-like copies, and repeated instances of one
   subject; and
@@ -174,11 +175,12 @@ provider behavior. Direct review still checks the actual video.
 
 ## Review failure classes
 
-Inspect for identity drift, an unapproved celebrity-like face, unexpected text,
-subtitle, logo, watermark, style drift, duplicate subject, wrong performer count,
-missing/extra limb, unstable high-energy action, extension jump or replay,
-progressive extension degradation, incorrect effect logic, clipped terminal audio,
-mispronunciation, voice mismatch, crowded staging, axis reversal, insufficient
-close-up dominance, and a wide Shot that does not cover a required position
-change. Route each problem to the owning department; never hide a generation defect
-in postproduction.
+Inspect for identity drift, an unapproved celebrity-like face, unreadable
+pseudo-writing or scene-contradictory text, generated subtitle/transcription, logo,
+watermark, style drift, duplicate subject, wrong performer count, missing/extra
+limb, unstable high-energy action, extension jump or replay, progressive extension
+degradation, incorrect effect logic, clipped terminal audio, mispronunciation,
+voice mismatch, crowded staging, axis reversal, insufficient close-up dominance,
+and a wide Shot that does not cover a required position change. Natural readable
+English scene text is allowed and is not independently a defect. Route each problem
+to the owning department; never hide a generation defect in postproduction.

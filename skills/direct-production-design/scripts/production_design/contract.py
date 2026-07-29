@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path, PurePosixPath
 import re
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from narrated_fable_drama.contracts.story_objects import (
+    VISUAL_AUTHORITY_MODES,
+    expected_visual_authority_mode,
+)
 from narrated_fable_drama.core.json_io import load_json_object
 
 
@@ -15,6 +19,7 @@ ROOT_KEYS = {
     "contract",
     "characters",
     "ensemble_rosters",
+    "object_authorities",
     "props",
     "costumes",
     "locations",
@@ -80,6 +85,11 @@ PROP_KEYS = {
     "description_en",
     "media_path",
     "generation_prompt",
+}
+OBJECT_AUTHORITY_KEYS = {
+    "object_id",
+    "mode",
+    "asset_ids",
 }
 COSTUME_KEYS = {
     "type",
@@ -512,9 +522,9 @@ def load_production_design_plan(
         error_type=ProductionDesignPlanError,
     )
     plan = _exact(payload, ROOT_KEYS, "production-design plan")
-    if plan["contract"] != "production-design-plan":
+    if plan["contract"] != "production-design-plan/v2":
         raise ProductionDesignPlanError(
-            "production-design plan contract must be production-design-plan"
+            "production-design plan contract must be production-design-plan/v2"
         )
 
     speaking_ids = {
@@ -1070,10 +1080,208 @@ def load_production_design_plan(
                 f"consistent; expected={expected_references}, actual={references}"
             )
 
+    story_objects = screenplay["story_objects"]
+    story_object_by_id = {
+        item["object_id"]: item for item in story_objects
+    }
+    raw_authorities = _list(
+        plan["object_authorities"], "object_authorities"
+    )
+    object_authorities: list[dict[str, Any]] = []
+    authority_by_object: dict[str, dict[str, Any]] = {}
+    asset_by_id = {
+        (
+            asset.get("entity_id")
+            or asset.get("asset_id")
+            or asset.get("location_id")
+        ): asset
+        for asset in all_assets
+    }
+    locations_by_scene = {
+        scene_id: location["location_id"]
+        for location in locations
+        for scene_id in location["scene_ids"]
+    }
+    for index, raw in enumerate(raw_authorities):
+        item = _exact(
+            raw,
+            OBJECT_AUTHORITY_KEYS,
+            f"object_authorities[{index}]",
+        )
+        object_id = _text(
+            item["object_id"],
+            f"object_authorities[{index}].object_id",
+        )
+        if object_id in authority_by_object:
+            raise ProductionDesignPlanError(
+                f"object_authorities repeats {object_id}"
+            )
+        story_object = story_object_by_id.get(object_id)
+        if story_object is None:
+            raise ProductionDesignPlanError(
+                f"object_authorities names unknown Story Object {object_id}"
+            )
+        mode = _text(item["mode"], f"{object_id}.mode")
+        if mode not in VISUAL_AUTHORITY_MODES:
+            raise ProductionDesignPlanError(
+                f"{object_id}.mode must be a supported visual-authority mode"
+            )
+        authority_asset_ids = _asset_ids(
+            item["asset_ids"], f"{object_id}.asset_ids"
+        )
+        owner_kind = story_object["physical_owner_kind"]
+        owner_id = story_object["physical_owner_id"]
+        parent_authority = (
+            authority_by_object.get(str(owner_id))
+            if owner_kind == "object"
+            else None
+        )
+        if owner_kind == "object" and parent_authority is None:
+            raise ProductionDesignPlanError(
+                f"{object_id} parent object must be routed earlier"
+            )
+        expected_mode = expected_visual_authority_mode(
+            story_object,
+            parent_mode=(
+                str(parent_authority["mode"])
+                if parent_authority is not None
+                else None
+            ),
+        )
+        if mode != expected_mode:
+            raise ProductionDesignPlanError(
+                f"{object_id} visual-authority mode must be {expected_mode}; "
+                f"actual={mode}"
+            )
+        if mode == "segment_prompt_only":
+            if authority_asset_ids:
+                raise ProductionDesignPlanError(
+                    f"{object_id} segment_prompt_only must not name asset_ids"
+                )
+        else:
+            if not authority_asset_ids:
+                raise ProductionDesignPlanError(
+                    f"{object_id} {mode} requires asset_ids"
+                )
+            unknown = set(authority_asset_ids) - known_ids
+            if unknown:
+                raise ProductionDesignPlanError(
+                    f"{object_id} names unknown visual-authority assets "
+                    f"{sorted(unknown)}"
+                )
+        if mode == "dedicated_asset":
+            dedicated_assets = [
+                asset_by_id[asset_id] for asset_id in authority_asset_ids
+            ]
+            if owner_kind == "character":
+                invalid = [
+                    asset_id
+                    for asset_id, asset in zip(authority_asset_ids, dedicated_assets)
+                    if asset["type"] not in {"prop", "costume"}
+                    or (
+                        asset["type"] == "costume"
+                        and asset["character_id"] != owner_id
+                    )
+                ]
+            else:
+                invalid = [
+                    asset_id
+                    for asset_id, asset in zip(authority_asset_ids, dedicated_assets)
+                    if asset["type"] != "prop"
+                ]
+            if invalid:
+                raise ProductionDesignPlanError(
+                    f"{object_id} dedicated assets have incompatible types or owners: "
+                    f"{invalid}"
+                )
+            if owner_kind == "environment":
+                expected_locations = list(
+                    dict.fromkeys(
+                        locations_by_scene[scene_id]
+                        for scene_id in story_object["scene_ids"]
+                    )
+                )
+                prop_assets = [
+                    asset_id
+                    for asset_id in authority_asset_ids
+                    if asset_by_id[asset_id]["type"] == "prop"
+                ]
+                for location_id in expected_locations:
+                    location = asset_by_id[location_id]
+                    missing_props = [
+                        asset_id
+                        for asset_id in prop_assets
+                        if asset_id not in location["included_prop_ids"]
+                    ]
+                    if missing_props:
+                        raise ProductionDesignPlanError(
+                            f"{object_id} fixed dedicated props must be included in "
+                            f"{location_id}: {missing_props}"
+                        )
+        elif mode == "covered_by_asset":
+            if owner_kind == "environment":
+                expected_assets = list(
+                    dict.fromkeys(
+                        locations_by_scene[scene_id]
+                        for scene_id in story_object["scene_ids"]
+                    )
+                )
+            elif owner_kind == "character":
+                expected_assets = [
+                    asset_id
+                    for asset_id, asset in asset_by_id.items()
+                    if asset_id == owner_id
+                    or (
+                        asset.get("type") == "costume"
+                        and asset.get("character_id") == owner_id
+                    )
+                ]
+            elif owner_kind == "object":
+                parent = parent_authority
+                if parent is None or not parent["asset_ids"]:
+                    raise ProductionDesignPlanError(
+                        f"{object_id} parent object must already resolve to assets"
+                    )
+                expected_assets = parent["asset_ids"]
+            else:
+                expected_assets = []
+            if not set(authority_asset_ids).issubset(expected_assets):
+                raise ProductionDesignPlanError(
+                    f"{object_id} covered_by_asset must use its physical owner's "
+                    f"approved assets; allowed={expected_assets}, "
+                    f"actual={authority_asset_ids}"
+                )
+        authority = {
+            "object_id": object_id,
+            "mode": mode,
+            "asset_ids": authority_asset_ids,
+        }
+        object_authorities.append(authority)
+        authority_by_object[object_id] = authority
+    expected_object_ids = [item["object_id"] for item in story_objects]
+    actual_object_ids = [item["object_id"] for item in object_authorities]
+    if actual_object_ids != expected_object_ids:
+        raise ProductionDesignPlanError(
+            "object_authorities must cover every Story Object exactly once and in "
+            f"order; expected={expected_object_ids}, actual={actual_object_ids}"
+        )
+    mapped_prop_ids = {
+        asset_id
+        for authority in object_authorities
+        for asset_id in authority["asset_ids"]
+        if asset_id in prop_ids
+    }
+    if mapped_prop_ids != prop_ids:
+        raise ProductionDesignPlanError(
+            "Every independent prop asset must trace to a Story Object; "
+            f"unmapped={sorted(prop_ids - mapped_prop_ids)}"
+        )
+
     return {
-        "contract": "production-design-plan",
+        "contract": "production-design-plan/v2",
         "characters": characters,
         "ensemble_rosters": ensembles,
+        "object_authorities": object_authorities,
         "props": props,
         "costumes": costumes,
         "locations": locations,

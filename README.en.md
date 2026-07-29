@@ -51,7 +51,7 @@ finishing pipeline are all handled automatically.
 | Resolution    | Defaults to `1080p`; choose `480p` / `720p` / `1080p` / `4K` |
 | Max duration  | `240` seconds                                               |
 | Audio         | Dialogue, narration, ambience, SFX, restrained score — all auto-synced |
-| Subtitles     | External and burned-in subtitles generated automatically; no text forced into the frame |
+| Subtitles     | External and burned-in subtitles generated automatically; natural English scene text is allowed, but generation-time captions are not forced into the frame |
 
 ---
 
@@ -162,8 +162,9 @@ Any issue is reported explicitly, and it **never auto-retries and never fudges a
 pass** — whether to accept is always your call.
 
 > **Your benefit:** Runaway pacing, mismatched lips, character continuity breaks,
-> text baked into the frame, and other typical AI failures are caught in bulk
-> before you ever see them.
+> unwanted generated captions or unreadable pseudo-writing, and other typical AI
+> failures are caught in bulk before you ever see them. Natural readable English
+> scene text is allowed.
 
 ### 3. A Narrator That Actually "Tells the Story," Plus Nested Fables
 

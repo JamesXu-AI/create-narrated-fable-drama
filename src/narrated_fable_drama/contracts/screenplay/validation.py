@@ -5,6 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from narrated_fable_drama.contracts.screenplay.boundaries import (
+    _validate_predecessor_inheritance_budget,
+    _validate_shot_scale_grammar,
+    validate_adjacent_visual_boundary_contract,
+    validate_cinematic_segment_contract,
+)
+from narrated_fable_drama.contracts.screenplay.performance import (
+    _validate_performance,
+)
 from narrated_fable_drama.contracts.screenplay.schema import (
     CHARACTER_STORY_ROLES,
     DRAMATIC_WORKLOADS,
@@ -17,24 +26,19 @@ from narrated_fable_drama.contracts.screenplay.schema import (
     ON_CAMERA_SPEECH_MODES,
     SCENE_ENTRY_BOUNDARIES,
     SLUGLINE_RE,
+    TIGHT_ATTENTION_VIEWS,
     TRANSITION_DESIGN_TYPES,
     concrete as _concrete,
     present as _present,
-)
-from narrated_fable_drama.contracts.screenplay.boundaries import (
-    _validate_predecessor_inheritance_budget,
-    _validate_shot_scale_grammar,
-    validate_adjacent_visual_boundary_contract,
-    validate_cinematic_segment_contract,
-)
-from narrated_fable_drama.contracts.screenplay.performance import (
-    _validate_performance,
 )
 from narrated_fable_drama.contracts.screenplay.speech import (
     screenplay_speech_rate_gate,
 )
 from narrated_fable_drama.contracts.screenplay.state import (
     _validate_character_scene_states,
+)
+from narrated_fable_drama.contracts.story_objects import (
+    VISUAL_CONTROL_TRIGGERS,
 )
 from narrated_fable_drama.core.speech_rate import analyze_speech
 from narrated_fable_drama.core.validation import StoryVideoError
@@ -141,6 +145,149 @@ def validate_screenplay(screenplay: dict[str, Any]) -> None:
         raise StoryVideoError("Scenes and Environment bindings differ")
     if set(screenplay["scene_dramatic_contracts"]) != {item["scene_id"] for item in scenes}:
         raise StoryVideoError("Every Scene needs exactly one Scene Dramatic Contract")
+
+    story_objects = screenplay["story_objects"]
+    known_scene_ids = {item["scene_id"] for item in scenes}
+    known_segment_ids = set(scene_by_segment)
+    known_character_ids = {item["entity_id"] for item in characters}
+    known_environment_ids = {
+        item["environment_id"] for item in environments
+    }
+    known_object_ids: set[str] = set()
+    shot_to_segment = {
+        shot["shot_id"]: segment["story_plan"]["segment_id"]
+        for segment in screenplay["segments"]
+        for shot in segment["shots"]
+    }
+    shot_scale = {
+        shot["shot_id"]: shot["scale_view"]
+        for segment in screenplay["segments"]
+        for shot in segment["shots"]
+    }
+    environment_scene_ids = {
+        item["environment_id"]: set(item["scene_ids_json"])
+        for item in environments
+    }
+    for index, story_object in enumerate(story_objects, start=1):
+        object_id = story_object["object_id"]
+        expected = f"object-{index:03d}"
+        if object_id != expected:
+            raise StoryVideoError(
+                f"Story Object {index} must use consecutive ID {expected}"
+            )
+        if (
+            not _concrete(story_object["name_en"])
+            or not _concrete(story_object["story_function_en"])
+        ):
+            raise StoryVideoError(
+                f"{object_id} needs a concrete Object and Story Function"
+            )
+        object_scenes = set(story_object["scene_ids"])
+        object_segments = set(story_object["segment_ids"])
+        if (
+            not object_scenes.issubset(known_scene_ids)
+            or not object_segments.issubset(known_segment_ids)
+            or {
+                scene_by_segment[segment_id]
+                for segment_id in object_segments
+            }
+            != object_scenes
+        ):
+            raise StoryVideoError(
+                f"{object_id} Scene IDs and Segment IDs must describe the same "
+                "screenplay scope"
+            )
+        triggers = set(story_object["visual_control_triggers"])
+        if not triggers.issubset(VISUAL_CONTROL_TRIGGERS):
+            raise StoryVideoError(f"{object_id} has unknown visual-control triggers")
+        authority_shots = story_object["visual_authority_shot_ids"]
+        if any(
+            shot_id not in shot_to_segment
+            or shot_to_segment[shot_id] not in object_segments
+            for shot_id in authority_shots
+        ):
+            raise StoryVideoError(
+                f"{object_id} Visual Authority Shot IDs must belong to its Segments"
+            )
+        if bool(triggers) != bool(authority_shots):
+            raise StoryVideoError(
+                f"{object_id} must pair visual-control triggers with exact Visual "
+                "Authority Shot IDs"
+            )
+        if (len(object_segments) > 1) != ("recurring_identity" in triggers):
+            raise StoryVideoError(
+                f"{object_id} recurring_identity must exactly match multi-Segment use"
+            )
+        if (
+            "recurring_identity" in triggers
+            and {
+                shot_to_segment[shot_id]
+                for shot_id in authority_shots
+            }
+            != object_segments
+        ):
+            raise StoryVideoError(
+                f"{object_id} recurring identity requires at least one Visual "
+                "Authority Shot in every listed Segment"
+            )
+        if (
+            "detail_view" in triggers
+            and not any(
+                shot_scale[shot_id] in TIGHT_ATTENTION_VIEWS
+                for shot_id in authority_shots
+            )
+        ):
+            raise StoryVideoError(
+                f"{object_id} detail_view requires a tight Visual Authority Shot"
+            )
+        if ("state_change" in triggers) != (
+            story_object["state_facts_en"] != "none"
+        ):
+            raise StoryVideoError(
+                f"{object_id} state_change must exactly match concrete State Facts"
+            )
+        if (
+            story_object["state_facts_en"] != "none"
+            and not _concrete(story_object["state_facts_en"])
+        ):
+            raise StoryVideoError(f"{object_id} State Facts must be concrete")
+        if ("distinctive_identity" in triggers) != (
+            story_object["identity_facts_en"] != "none"
+        ):
+            raise StoryVideoError(
+                f"{object_id} distinctive_identity must exactly match concrete "
+                "Identity Facts"
+            )
+        if (
+            story_object["identity_facts_en"] != "none"
+            and not _concrete(story_object["identity_facts_en"])
+        ):
+            raise StoryVideoError(f"{object_id} Identity Facts must be concrete")
+        owner_kind = story_object["physical_owner_kind"]
+        owner_id = story_object["physical_owner_id"]
+        if owner_kind == "independent":
+            if owner_id is not None:
+                raise StoryVideoError(f"{object_id} independent owner needs no ID")
+        elif owner_kind == "environment":
+            if owner_id not in known_environment_ids or not object_scenes.issubset(
+                environment_scene_ids[owner_id]
+            ):
+                raise StoryVideoError(
+                    f"{object_id} names an environment outside its Scene scope"
+                )
+        elif owner_kind == "character":
+            if owner_id not in known_character_ids:
+                raise StoryVideoError(
+                    f"{object_id} names unknown character owner {owner_id}"
+                )
+        elif owner_kind == "object":
+            if owner_id not in known_object_ids:
+                raise StoryVideoError(
+                    f"{object_id} parent object must be declared earlier"
+                )
+        else:
+            raise StoryVideoError(f"{object_id} has invalid physical owner")
+        known_object_ids.add(object_id)
 
     states = screenplay["continuity_states"]
     for index, state in enumerate(states, start=1):

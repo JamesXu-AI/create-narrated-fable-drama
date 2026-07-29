@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
+from narrated_fable_drama.contracts.screenplay import load_screenplay_file
 from narrated_fable_drama.contracts.storyboard import (
     StoryboardDocument,
     comma_values,
@@ -46,6 +47,15 @@ ORDERED_SHOT_HEADERS = (
     "Lighting and Color",
     "Dialogue and Native Audio",
     "Landing and Edit",
+)
+REFERENCE_PLAN_HEADERS = (
+    "Provider Token",
+    "Provider Role",
+    "Asset Namespace",
+    "Readable Subject",
+    "Purpose",
+    "Shot Scope",
+    "Forbidden Inheritance",
 )
 STORYBOARD_SHOT_SIZES = {
     "extreme_close_up",
@@ -653,6 +663,111 @@ def _production_design_asset_map(task_dir: Path) -> dict[str, str]:
     return result
 
 
+def _validate_visual_object_reference_coverage(
+    task_dir: Path,
+    storyboard_text: str,
+) -> None:
+    """Require every authored visual-authority Shot to bind its covering images."""
+
+    screenplay = load_screenplay_file(
+        task_dir / "screenplay-writer" / "screenplay.md"
+    )
+    plan = load_json_object(
+        task_dir / "direct-production-design" / "production-design-plan.json",
+        label="production-design authority",
+        error_type=StoryboardValidationError,
+    )
+    authorities = {
+        item.get("object_id"): item
+        for item in plan.get("object_authorities", [])
+        if isinstance(item, dict) and isinstance(item.get("object_id"), str)
+    }
+    ordered_shots = _ordered_shot_map(storyboard_text)
+    execution_by_screenplay_shot: dict[str, list[tuple[str, str]]] = {}
+    for segment_id, internal_shots in ordered_shots.items():
+        for shot_label, screenplay_shots in internal_shots.items():
+            for screenplay_shot in screenplay_shots:
+                execution_by_screenplay_shot.setdefault(
+                    screenplay_shot, []
+                ).append((segment_id, shot_label))
+
+    bindings_by_segment: dict[str, dict[str, set[str]]] = {}
+    matches = list(SEGMENT_HEADING_RE.finditer(storyboard_text))
+    for index, match in enumerate(matches):
+        segment_id = f"segment-{int(match.group(1)):03d}"
+        end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(storyboard_text)
+        )
+        section = storyboard_text[match.end():end]
+        headers, rows = _table_after_heading(section, "### Reference Plan")
+        if tuple(headers) != REFERENCE_PLAN_HEADERS:
+            raise StoryboardValidationError(
+                f"{segment_id} Reference Plan columns differ from the current contract"
+            )
+        current: dict[str, set[str]] = {}
+        all_internal = set(ordered_shots[segment_id])
+        for row in rows:
+            if row[1] != "reference_image":
+                continue
+            namespace = row[2]
+            scope = row[5]
+            if scope.casefold() == "all":
+                covered = all_internal
+            else:
+                covered = set(re.findall(r"Shot [1-9][0-9]*", scope))
+                if not covered or not covered.issubset(all_internal):
+                    raise StoryboardValidationError(
+                        f"{segment_id} {namespace} has invalid Reference Plan "
+                        "Shot Scope"
+                    )
+            current.setdefault(namespace, set()).update(covered)
+        bindings_by_segment[segment_id] = current
+
+    for story_object in screenplay["story_objects"]:
+        required_shots = story_object["visual_authority_shot_ids"]
+        if not required_shots:
+            continue
+        object_id = story_object["object_id"]
+        authority = authorities.get(object_id)
+        if not isinstance(authority, dict):
+            raise StoryboardValidationError(
+                f"Production design lacks visual authority for {object_id}"
+            )
+        asset_ids = authority.get("asset_ids")
+        if (
+            authority.get("mode") == "segment_prompt_only"
+            or not isinstance(asset_ids, list)
+            or not asset_ids
+            or any(not isinstance(item, str) for item in asset_ids)
+        ):
+            raise StoryboardValidationError(
+                f"{object_id} Visual Authority Shots require approved image assets"
+            )
+        for screenplay_shot in required_shots:
+            executions = execution_by_screenplay_shot.get(screenplay_shot, [])
+            if not executions:
+                raise StoryboardValidationError(
+                    f"{object_id} Visual Authority Shot {screenplay_shot} is not "
+                    "executed by the Storyboard"
+                )
+            for segment_id, shot_label in executions:
+                missing = [
+                    asset_id
+                    for asset_id in asset_ids
+                    if shot_label
+                    not in bindings_by_segment.get(segment_id, {}).get(
+                        asset_id, set()
+                    )
+                ]
+                if missing:
+                    raise StoryboardValidationError(
+                        f"{segment_id} {shot_label} must bind {object_id} visual "
+                        f"authority images {missing}"
+                    )
+
+
 def _validate_character_state_plan(
     task_dir: Path,
     storyboard_text: str,
@@ -978,6 +1093,7 @@ def validate_storyboard(task_dir: Path) -> dict:
             raise StoryboardValidationError(
                 "Storyboard Shot coverage or order differs from the approved screenplay"
             )
+    _validate_visual_object_reference_coverage(task_dir, text)
     return {
         "status": "PASS",
         "storyboard": str(storyboard),

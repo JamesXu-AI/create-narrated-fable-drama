@@ -142,6 +142,32 @@ regardless of its member-type count. Never turn a silent individual into a group
 a speaking individual into a different class merely because of dialogue; `Kind`
 alone owns that classification. Preserve source-required and speaking roles first.
 
+### Register story objects, not nouns
+
+Author one `Story Objects` row only for an object whose visual behavior matters to
+the drama: it is causal, recurring, state-changing, interaction-sensitive,
+detail-bearing, or identity-critical. Do not inventory ordinary furniture,
+background decoration, generic one-off handling objects, body parts, weather,
+light, or every noun in the prose.
+
+For each registered object, state its physical owner and only the visual-control
+triggers that are true:
+
+```text
+recurring_identity | detail_view | state_change |
+interaction_geometry | distinctive_identity
+```
+
+Every trigger names exact screenplay Shots in which positive visual authority is
+required. Multi-Segment use requires `recurring_identity`; `state_change` requires
+concrete State Facts; `distinctive_identity` requires concrete Identity Facts.
+Use `none` for triggers and authority Shots when a story-relevant but generic,
+independent one-off object can safely remain Segment-Prompt-only.
+
+The writer never decides whether the resulting authority is a prop image,
+Location, character, costume, parent prop, or Prompt. Production design owns that
+decision.
+
 ## Output
 
 Write exactly:
@@ -171,4 +197,6 @@ Release only when:
 8. the complete screenplay reads naturally aloud in the target language; and
 9. the few-character, eyeline-axis, close-up-led grammar is explicit, tight views
    dominate, and every wide view carries a concrete position-change exception; and
-10. the full screenplay speech-rate gate passes every Line before release.
+10. every story-relevant visual object has exact physical ownership and
+    visual-control facts without inventorying incidental nouns; and
+11. the full screenplay speech-rate gate passes every Line before release.

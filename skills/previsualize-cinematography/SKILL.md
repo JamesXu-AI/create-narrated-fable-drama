@@ -90,16 +90,19 @@ cannot deactivate a positive image reference.
    reference requirements conflict or a natural speech boundary improves execution.
 8. Bind every visible performer and needed voice while omitting positive images for
    visually absent storytellers.
-9. Resolve every Segment boundary, audio bridge, ambience handoff, predecessor
+9. For every screenplay Story Object Visual Authority Shot, bind every asset named
+   by its production-design `object_authorities` entry with Shot Scope covering
+   the exact internal Shot. Do not bind Prompt-only objects or unrelated props.
+10. Resolve every Segment boundary, audio bridge, ambience handoff, predecessor
    dependency, and return to a prior Location.
-10. Validate:
+11. Validate:
 
 ```text
 scripts/run_python.sh skills/previsualize-cinematography/scripts/validate_storyboard.py \
   --task-dir TASK_DIR
 ```
 
-11. Reread the complete Storyboard as director, performer, editor, sound designer,
+12. Reread the complete Storyboard as director, performer, editor, sound designer,
     continuity supervisor, and Seedance prompt author.
 
 Require the returned full `speech_rate_gate.status=PASS`. It covers every
