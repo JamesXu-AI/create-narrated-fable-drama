@@ -69,6 +69,11 @@ For generated video, watch the full clip at normal speed with sound. Check:
   ambience remain continuous where the story requires;
 - camera, action, internal cuts, effects, native music, safe ending, and external
   seam are usable;
+- when Seedance ends a video before its native music phrase resolves, do not
+  reject or request regeneration for the unfinished cadence alone; accept an
+  evidence-authored short fade, zero-overlap soft cut, real crossfade, or safe
+  audio bridge when the jump is no longer obvious at normal listening speed and
+  speech, lip sync, and key effects remain intact;
 - the frame is not crowded with unnecessary characters; cropped but present roles
   remain spatially credible without forcing a full-cast master;
 - speaker/listener gaze, screen-left/right assignment, reverse angle, and camera

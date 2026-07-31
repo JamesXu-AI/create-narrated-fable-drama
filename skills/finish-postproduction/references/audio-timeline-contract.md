@@ -34,13 +34,19 @@ background_music_source: seedance_native
 ```
 
 Do not pre-create a separate SeedAudio track, score policy, or score anchors in this
-main-flow artifact. Motivated cuts use a synchronized edge de-click. Authored dissolve/fade
-boundaries may overlap picture and native audio by the exact authored duration.
+main-flow artifact. Motivated cuts may use an explicit synchronized edge de-click.
+When a generated video forces an unfinished native-music phrase to stop, an
+authored `soft_cut` may apply a short fade-out and/or fade-in on dialogue-free
+edge material without overlapping or moving either audio event. Authored
+dissolve/fade boundaries may overlap picture and native audio by the exact
+authored duration.
 Native dialogue, effects, and ambience never move across a Segment boundary.
 At an incoming `video_extension`, picture and native audio share the same official
 six-tail-frame/one-head-frame source trim after dialogue-free handles are verified.
 The final native event receives a short terminal fade to prevent an audio click;
-that fade never moves or replaces dialogue.
+that fade never moves, replaces, or attenuates dialogue. An unresolved musical
+cadence is acceptable after normal-speed listening no longer detects an obvious
+jump; cadence incompleteness alone does not trigger regeneration.
 
 ## Delivery
 

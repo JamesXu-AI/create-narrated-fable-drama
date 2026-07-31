@@ -91,7 +91,13 @@ The model inspects and selects candidates. The tool never ranks them.
 - keep picture and audio transition decisions independent;
 - require every execution value explicitly; never let code supply semantic
   durations, handles, gains, fades, repair strengths, or fallback operations;
-- execute authored hard cuts, J/L audio handoffs, dissolves, fades, and safe trims;
+- execute authored hard cuts, zero-overlap audio soft cuts, J/L audio handoffs,
+  crossfades, ambience bridges, dissolves, fades, and safe trims;
+- treat a Seedance clip ending before its native music phrase resolves as a
+  current provider limitation: an unfinished cadence alone does not require
+  regeneration when the smallest dialogue-free fade, crossfade, or safe bridge
+  removes the obvious jump at normal listening speed; never let that repair
+  attenuate speech, move lip sync, or mask a key effect;
 - run reversible boundary QC before and after assembly;
 - apply only bounded technical normalization; do not redesign composition,
   identity, world state, or color intent;

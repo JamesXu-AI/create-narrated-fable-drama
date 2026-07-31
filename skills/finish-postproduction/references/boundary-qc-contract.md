@@ -38,6 +38,13 @@ The six-second observation window is not an automatic repair range.
 `boundary_local` changes remain inside it. Only an explicit
 `segment_scope_review` may authorize a wider range.
 
+If Seedance ends the picture while its baked native music phrase is still in
+progress, inspect the synchronized seam at normal speed. The model may accept the
+provider limitation after an explicit short soft cut, real crossfade, or safe
+bridge makes the jump no longer obvious. The unresolved phrase alone is not a
+regeneration trigger. Any repair that attenuates dialogue, moves lip sync, or
+masks a key effect is unsafe and must be rejected.
+
 ## Technical audit evidence
 
 For every cut-like boundary, create exactly the predecessor's final 1.0 second plus

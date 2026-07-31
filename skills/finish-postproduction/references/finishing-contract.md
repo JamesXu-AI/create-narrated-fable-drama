@@ -42,6 +42,14 @@ Every source window, timeline offset, gain, fade, and terminal fade is explicit 
 the model plan. The renderer never pads silence, invents a de-click duration, or
 adds a terminal fade.
 
+A Seedance-native music phrase that is still in progress when its generated video
+ends is a current provider limitation, not by itself a regeneration defect.
+Postproduction may use an explicitly measured short zero-overlap soft cut, a real
+crossfade, or a safe dialogue-free audio bridge. The repaired seam is acceptable
+when normal-speed listening no longer reveals an obvious jump. The plan validator
+rejects fades over protected dialogue; the Editor and Restoration Master must also
+prove that the chosen repair does not move lip sync or mask a key sound effect.
+
 ## Subtitle chain
 
 ```text

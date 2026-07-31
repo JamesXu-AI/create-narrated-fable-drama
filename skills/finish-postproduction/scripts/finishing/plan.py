@@ -329,6 +329,37 @@ def _one_range_contains(
     )
 
 
+def _retained_interval(
+    ranges: list[tuple[float, float]],
+    start: float,
+    end: float,
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """Map one intact source interval onto its retained event timeline."""
+    cursor = 0.0
+    for range_start, range_end in ranges:
+        if range_start <= start + 1e-6 and range_end >= end - 1e-6:
+            return (
+                cursor + max(0.0, start - range_start),
+                cursor + min(range_end - range_start, end - range_start),
+            )
+        cursor += range_end - range_start
+    raise RepairPlanError(f"{label} does not lie inside retained media")
+
+
+def _intervals_overlap(
+    first_start: float,
+    first_end: float,
+    second_start: float,
+    second_end: float,
+) -> bool:
+    return (
+        first_start < second_end - 1e-6
+        and first_end > second_start + 1e-6
+    )
+
+
 def _validate_segment_plan(
     item: object,
     *,
@@ -525,6 +556,30 @@ def _validate_segment_plan(
             raise RepairPlanError(
                 f"{segment_id} edit removes protected dialogue {line_id}"
             )
+        retained_start, retained_end = _retained_interval(
+            audio_ranges,
+            start,
+            end,
+            label=f"{segment_id} protected dialogue {line_id}",
+        )
+        if fade_in > 0 and _intervals_overlap(
+            retained_start,
+            retained_end,
+            0.0,
+            fade_in,
+        ):
+            raise RepairPlanError(
+                f"{segment_id} audio fade-in overlaps protected dialogue {line_id}"
+            )
+        if fade_out > 0 and _intervals_overlap(
+            retained_start,
+            retained_end,
+            audio_duration - fade_out,
+            audio_duration,
+        ):
+            raise RepairPlanError(
+                f"{segment_id} audio fade-out overlaps protected dialogue {line_id}"
+            )
         expected_lines.append(line_id)
     protected = _string_list(
         segment["protected_dialogue_line_ids"],
@@ -700,6 +755,7 @@ def _validate_boundary_plan(
     )
     if audio_operation not in {
         "native_cut",
+        "soft_cut",
         "crossfade",
         "j_cut",
         "l_cut",
@@ -768,6 +824,22 @@ def _validate_boundary_plan(
     ):
         raise RepairPlanError(
             f"{boundary_id} {audio_operation} must be a zero-offset, zero-fade cut"
+        )
+    if audio_operation == "soft_cut" and (
+        abs(outgoing_audio_end_relative_to_transition) > 1e-6
+        or abs(incoming_audio_start_relative_to_transition) > 1e-6
+    ):
+        raise RepairPlanError(
+            f"{boundary_id} soft_cut must keep both native audio events "
+            "aligned to a zero-overlap picture seam"
+        )
+    if (
+        audio_operation == "soft_cut"
+        and outgoing_fade <= 0
+        and incoming_fade <= 0
+    ):
+        raise RepairPlanError(
+            f"{boundary_id} soft_cut requires at least one explicit audio fade"
         )
     if (
         audio_operation == "j_cut"
@@ -1282,11 +1354,51 @@ def load_repair_plan(
     )
     if terminal.get("segment_id") != evidence_ids[-1]:
         raise RepairPlanError("Terminal audio plan must name the final Segment")
-    _number(
+    final_segment = segment_plan_by_id[evidence_ids[-1]]
+    final_picture = final_segment["picture"]
+    final_picture_ranges = _kept_ranges(
+        float(final_picture["source_in_seconds"]),
+        float(final_picture["source_out_seconds"]),
+        final_picture["removed_intervals"],
+    )
+    final_picture_duration = sum(
+        end - start for start, end in final_picture_ranges
+    )
+    terminal_fade = _number(
         terminal["fade_out_seconds"],
         label="terminal audio fade",
         minimum=0.0,
+        maximum=final_picture_duration,
     )
+    if terminal_fade > 0:
+        final_audio = final_segment["audio"]
+        final_audio_ranges = _kept_ranges(
+            float(final_audio["source_in_seconds"]),
+            float(final_audio["source_out_seconds"]),
+            final_audio["removed_intervals"],
+        )
+        audio_offset = float(
+            final_audio["timeline_offset_from_picture_in_seconds"]
+        )
+        terminal_start = final_picture_duration - terminal_fade
+        for cue in evidence_by_id[evidence_ids[-1]]["dialogue_cues"]:
+            line_id = str(cue["line_id"])
+            retained_start, retained_end = _retained_interval(
+                final_audio_ranges,
+                float(cue["start_seconds"]),
+                float(cue["end_seconds"]),
+                label=f"{evidence_ids[-1]} protected dialogue {line_id}",
+            )
+            if _intervals_overlap(
+                audio_offset + retained_start,
+                audio_offset + retained_end,
+                terminal_start,
+                final_picture_duration,
+            ):
+                raise RepairPlanError(
+                    "Terminal audio fade overlaps protected dialogue "
+                    f"{line_id}"
+                )
     _string(terminal["reason"], label="terminal audio reason")
     _validate_delivery(plan["delivery"])
     _string(plan["overall_reason"], label="overall repair-plan reason")

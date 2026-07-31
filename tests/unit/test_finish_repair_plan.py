@@ -281,6 +281,149 @@ class RepairPlanTests(unittest.TestCase):
             ensure_renderable(loaded)
             self.assertEqual(loaded["boundaries"][0]["decision"], "no_op")
 
+    def test_soft_cut_can_smooth_forced_music_stop_without_audio_overlap(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            records, evidence_path, plan = _fixture(tmp_path)
+            plan["segments"][0]["audio"]["fade_out_seconds"] = 0.4
+            plan["segments"][1]["audio"]["fade_in_seconds"] = 0.3
+            boundary = plan["boundaries"][0]
+            boundary["decision"] = "repair"
+            boundary["audio"] = {
+                "operation": "soft_cut",
+                "outgoing_fade_out_seconds": 0.4,
+                "incoming_fade_in_seconds": 0.3,
+            }
+            boundary["modification_intervals"] = [
+                {
+                    "media": "audio",
+                    "segment_id": "segment-001",
+                    "start_seconds": 9.6,
+                    "end_seconds": 10.0,
+                    "reason": "Soften the forced Seedance music stop.",
+                },
+                {
+                    "media": "audio",
+                    "segment_id": "segment-002",
+                    "start_seconds": 0.0,
+                    "end_seconds": 0.3,
+                    "reason": "Ease into the successor native mix.",
+                },
+            ]
+            boundary["reason"] = (
+                "The unfinished musical phrase is a provider boundary artifact; "
+                "short dialogue-free fades make the cut unobtrusive."
+            )
+            loaded = _load(tmp_path, records, evidence_path, plan)
+            ensure_renderable(loaded)
+            self.assertEqual(
+                loaded["boundaries"][0]["audio"]["operation"],
+                "soft_cut",
+            )
+
+    def test_soft_cut_requires_an_explicit_fade(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            records, evidence_path, plan = _fixture(tmp_path)
+            boundary = plan["boundaries"][0]
+            boundary["decision"] = "repair"
+            boundary["audio"]["operation"] = "soft_cut"
+            with self.assertRaisesRegex(
+                RepairPlanError,
+                "soft_cut requires at least one explicit audio fade",
+            ):
+                _load(tmp_path, records, evidence_path, plan)
+
+    def test_soft_cut_cannot_move_native_audio_or_overlap_picture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            records, evidence_path, plan = _fixture(tmp_path)
+            plan["segments"][0]["audio"]["fade_out_seconds"] = 0.4
+            boundary = plan["boundaries"][0]
+            boundary["decision"] = "repair"
+            boundary["picture"] = {
+                "operation": "dissolve",
+                "overlap_seconds": 0.2,
+            }
+            boundary["audio"] = {
+                "operation": "soft_cut",
+                "outgoing_fade_out_seconds": 0.4,
+                "incoming_fade_in_seconds": 0.0,
+            }
+            boundary["modification_intervals"] = [
+                {
+                    "media": "picture",
+                    "segment_id": "segment-001",
+                    "start_seconds": 9.8,
+                    "end_seconds": 10.0,
+                    "reason": "Explicit outgoing dissolve handle.",
+                },
+                {
+                    "media": "picture",
+                    "segment_id": "segment-002",
+                    "start_seconds": 0.0,
+                    "end_seconds": 0.2,
+                    "reason": "Explicit incoming dissolve handle.",
+                },
+                {
+                    "media": "audio",
+                    "segment_id": "segment-001",
+                    "start_seconds": 9.6,
+                    "end_seconds": 10.0,
+                    "reason": "Explicit outgoing soft fade.",
+                },
+            ]
+            with self.assertRaisesRegex(
+                RepairPlanError,
+                "soft_cut must keep both native audio events aligned",
+            ):
+                _load(tmp_path, records, evidence_path, plan)
+
+    def test_segment_fade_cannot_overlap_protected_dialogue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            records, evidence_path, plan = _fixture(tmp_path)
+            plan["segments"][0]["audio"]["fade_out_seconds"] = 7.0
+            boundary = plan["boundaries"][0]
+            boundary["decision"] = "repair"
+            boundary["scope"] = "segment_scope_review"
+            boundary["audio"] = {
+                "operation": "soft_cut",
+                "outgoing_fade_out_seconds": 7.0,
+                "incoming_fade_in_seconds": 0.0,
+            }
+            boundary["modification_intervals"] = [
+                {
+                    "media": "audio",
+                    "segment_id": "segment-001",
+                    "start_seconds": 3.0,
+                    "end_seconds": 10.0,
+                    "reason": "Deliberately unsafe fade.",
+                }
+            ]
+            with self.assertRaisesRegex(
+                RepairPlanError,
+                "audio fade-out overlaps protected dialogue L-001",
+            ):
+                _load(tmp_path, records, evidence_path, plan)
+
+    def test_terminal_fade_cannot_overlap_protected_dialogue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp_path = Path(temporary)
+            records, evidence_path, plan = _fixture(tmp_path)
+            plan["terminal_audio"] = {
+                "segment_id": "segment-002",
+                "fade_out_seconds": 7.0,
+                "reason": "Deliberately unsafe terminal fade.",
+            }
+            with self.assertRaisesRegex(
+                RepairPlanError,
+                "Terminal audio fade overlaps protected dialogue L-002",
+            ):
+                _load(tmp_path, records, evidence_path, plan)
+
     def test_missing_semantic_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             tmp_path = Path(temporary)
@@ -539,6 +682,11 @@ class RepairPlanTests(unittest.TestCase):
             delivery,
         )
         self.assertIn("xfade=transition=fade:duration=0.500000", filter_graph)
+        self.assertIn(
+            "afade=t=out:st=9.800000:d=0.200000",
+            filter_graph,
+        )
+        self.assertIn("afade=t=in:st=0:d=0.200000", filter_graph)
         self.assertIn("amix=inputs=2:duration=longest:normalize=0", filter_graph)
         self.assertIn("adelay=446400S:all=1", filter_graph)
         self.assertNotIn("apad", filter_graph)

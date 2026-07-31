@@ -37,6 +37,12 @@ story, performance, speech, camera, or continuity authority.
   choices are `480p`, `720p`, `1080p`, and `4k`.
 - Dialogue, storytelling, narration, breaths, reactions, ambience, effects, and
   authored music are generated as synchronized Seedance-native audio.
+- Seedance may end a generated video while its baked native music phrase is still
+  unresolved. Treat that forced stop as a current model limitation: an unfinished
+  cadence alone does not trigger regeneration. Postproduction may use an explicit
+  short fade, zero-overlap soft cut, real crossfade, or safe dialogue-free bridge;
+  accept it when the jump is no longer obvious at normal listening speed and
+  dialogue, lip sync, and key effects remain intact.
 - Generated subtitles and on-screen transcription are forbidden. Captions belong
   to postproduction.
 - Natural, readable English words, labels, signs, notes, and other scene-native

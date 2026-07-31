@@ -95,7 +95,7 @@ Every evidence boundary appears once and in order:
     "overlap_seconds": 0.0
   },
   "audio": {
-    "operation": "native_cut | crossfade | j_cut | l_cut | ambient_bridge | no_op",
+    "operation": "native_cut | soft_cut | crossfade | j_cut | l_cut | ambient_bridge | no_op",
     "outgoing_fade_out_seconds": 0.0,
     "incoming_fade_in_seconds": 0.0
   },
@@ -113,6 +113,16 @@ outgoing final 3 seconds or incoming first 3 seconds. An interval beyond that
 range requires the model to choose `segment_scope_review`; the tool never widens
 scope itself.
 
+`soft_cut` is the zero-overlap repair for a baked Seedance-native track whose
+music is audibly forced to stop at the video boundary. It keeps both native audio
+events aligned with their pictures and requires at least one explicit outgoing
+or incoming fade. Use only measured dialogue-free edge intervals and declare
+each fade in `modification_intervals`. It is not a crossfade and creates no
+invented audio handle. Prefer `crossfade`, J/L Cut, or `ambient_bridge` only when
+real, safe source handles support that operation. An incomplete musical phrase
+alone is not a `regenerate` reason once normal-speed listening finds no obvious
+jump.
+
 ## Audio bridge
 
 Each optional bridge declares `bridge_id`, `boundary_id`, `source_segment_id`,
@@ -126,11 +136,13 @@ The plan explicitly names the final Segment, terminal fade duration, and reason.
 It also explicitly supplies video codec, preset, CRF, pixel format, audio codec,
 audio bitrate, sample rate, and channel layout. Current renderer support is
 `libx264`, `yuv420p`, `aac`, and `stereo`; unsupported explicit choices fail.
+Segment and terminal fades may not overlap protected dialogue.
 
 ## Validation
 
 The validator rejects missing or unknown fields, stale evidence, changed source
 hashes, provider-attempt mismatch, incomplete Segment or boundary coverage,
 removed dialogue, invalid source windows, out-of-scope local modification,
-unsupported operations, and implicit audio padding. A `regenerate` decision is a
-valid model conclusion but blocks rendering.
+audio fades over protected dialogue, unsupported operations, and implicit audio
+padding. A `regenerate` decision is a valid model conclusion but blocks
+rendering.
