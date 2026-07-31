@@ -17,6 +17,7 @@ from narrated_fable_drama.contracts.segment import (
     extension_quality_reset_schedule,
     load_execution_plan,
     parse_segment_script,
+    provider_identity_roles,
     read_json,
     sha256_file,
     storyboard_segment_rows,
@@ -64,29 +65,18 @@ def identity_reference_audit(
         if isinstance(continuity, dict)
         else []
     )
-    renderable_ids = [
-        item.get("character_asset_id")
-        for item in states
-        if isinstance(item, dict)
-        and item.get("segment_presence_rule") != "remain_absent"
-    ]
-    absent_ids = [
-        item.get("character_asset_id")
-        for item in states
-        if isinstance(item, dict)
-        and item.get("segment_presence_rule") == "remain_absent"
-    ]
+    renderable_ids, non_submission_ids = provider_identity_roles(states)
     coverage = plan.get("identity_reference_coverage")
     non_submission = plan.get("identity_non_submission_roles")
     if (
         not isinstance(coverage, dict)
         or set(coverage) != set(renderable_ids)
-        or non_submission != absent_ids
+        or non_submission != non_submission_ids
     ):
         raise SegmentRuntimeError(
             f"{segment_id} identity-image coverage is stale: every "
-            "provider-renderable role must have an image and remain_absent roles "
-            "must be internal-only"
+            "provider-visible role must have an image and roles with no required "
+            "visible shots must be internal-only"
         )
 
     binding_by_id = {
@@ -543,6 +533,25 @@ def preflight_segment(
             raise SegmentRuntimeError(f"{segment_id} has invalid {role} count")
         if isinstance(limit, bool) or not isinstance(limit, int) or count > limit:
             raise SegmentRuntimeError(f"{segment_id} exceeds the {role} capability")
+    audio_duration_policy = plan.get("reference_audio_duration_policy")
+    maximum_audio_seconds = capabilities.get(
+        "maximum_reference_audio_total_seconds"
+    )
+    if (
+        not isinstance(audio_duration_policy, dict)
+        or isinstance(maximum_audio_seconds, bool)
+        or not isinstance(maximum_audio_seconds, (int, float))
+        or audio_duration_policy.get("maximum_total_seconds")
+        != float(maximum_audio_seconds)
+        or not isinstance(
+            audio_duration_policy.get("provider_total_seconds"), (int, float)
+        )
+        or audio_duration_policy["provider_total_seconds"]
+        > float(maximum_audio_seconds)
+    ):
+        raise SegmentRuntimeError(
+            f"{segment_id} reference-audio duration policy exceeds capability"
+        )
     required_visible_by_shot = {
         f"Shot {shot_number}": [
             item["character_asset_id"]
@@ -565,6 +574,7 @@ def preflight_segment(
         "reference_image_count": media_counts["reference_image"],
         "reference_video_count": media_counts["reference_video"],
         "reference_audio_count": media_counts["reference_audio"],
+        "reference_audio_duration_policy": audio_duration_policy,
         "media_bindings_resolved": True,
         "identity_reference_coverage": identity_audit,
         "identity_non_submission_roles": plan.get(

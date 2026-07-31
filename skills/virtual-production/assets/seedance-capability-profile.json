@@ -10,6 +10,7 @@
     "maximum_reference_images": 9,
     "maximum_reference_videos": 3,
     "maximum_reference_audios": 3,
+    "maximum_reference_audio_total_seconds": 15.2,
     "supported_resolutions": [
       "480p",
       "720p",

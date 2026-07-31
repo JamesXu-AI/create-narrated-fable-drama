@@ -102,6 +102,13 @@ def compile_cues(task_dir: Path, style_path: Path) -> dict[str, Any]:
         compute_type=str(style["alignment_compute_type"]),
         beam_size=int(style["alignment_beam_size"]),
         vad_filter=bool(style["alignment_vad_filter"]),
+        ownership_windows=[
+            (
+                float(item["window_start_seconds"]),
+                float(item["window_end_seconds"]),
+            )
+            for item in source_cue_specs
+        ],
     )
     audio_alignments = align_authoritative_cues(
         source_cue_specs,

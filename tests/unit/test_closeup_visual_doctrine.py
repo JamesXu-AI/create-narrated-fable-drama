@@ -15,6 +15,10 @@ from narrated_fable_drama.contracts.screenplay.boundaries import (
     _validate_shot_scale_grammar,
 )
 from narrated_fable_drama.contracts.segment.prompt import _validate_prompt
+from narrated_fable_drama.contracts.segment.execution import (
+    audio_reference_duration_policy,
+    provider_identity_roles,
+)
 from narrated_fable_drama.contracts.segment.common import SegmentRuntimeError
 from narrated_fable_drama.core.validation import StoryVideoError
 from validate_storyboard import (  # noqa: E402
@@ -136,6 +140,42 @@ def _write_screenplay_shot_stub(task_dir: Path, scales: list[str]) -> None:
 
 
 class CloseupVisualDoctrineTests(unittest.TestCase):
+    def test_three_voice_references_are_trimmed_below_aggregate_limit(self) -> None:
+        durations = audio_reference_duration_policy([6.0, 6.0, 6.0], 15.2)
+
+        self.assertEqual(durations, [5.0, 5.0, 5.0])
+        self.assertLessEqual(sum(durations), 15.2)
+
+    def test_two_voice_references_keep_full_duration_when_under_limit(self) -> None:
+        self.assertEqual(
+            audio_reference_duration_policy([6.0, 6.0], 15.2),
+            [6.0, 6.0],
+        )
+
+    def test_off_crop_present_role_is_not_submitted_as_positive_identity(self) -> None:
+        submitted, internal_only = provider_identity_roles(
+            [
+                {
+                    "character_asset_id": "e",
+                    "segment_presence_rule": "must_remain_present",
+                    "required_visible_shots": [2, 3],
+                },
+                {
+                    "character_asset_id": "mo",
+                    "segment_presence_rule": "must_remain_present",
+                    "required_visible_shots": [],
+                },
+                {
+                    "character_asset_id": "mee",
+                    "segment_presence_rule": "remain_absent",
+                    "required_visible_shots": [],
+                },
+            ]
+        )
+
+        self.assertEqual(submitted, ["e"])
+        self.assertEqual(internal_only, ["mo", "mee"])
+
     def test_screenplay_wide_requires_position_change_exception(self) -> None:
         with self.assertRaisesRegex(
             StoryVideoError, "position-change exception"

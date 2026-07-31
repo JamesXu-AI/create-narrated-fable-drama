@@ -682,6 +682,24 @@ def _validate_visual_object_reference_coverage(
         for item in plan.get("object_authorities", [])
         if isinstance(item, dict) and isinstance(item.get("object_id"), str)
     }
+    catalog_path = task_dir.parent.parent / "assets" / "assets.json"
+    derived_assets_by_parent: dict[str, set[str]] = {}
+    if catalog_path.is_file():
+        catalog = load_json_object(
+            catalog_path,
+            label="asset catalog",
+            error_type=StoryboardValidationError,
+        )
+        assets = catalog.get("assets")
+        if isinstance(assets, dict):
+            for namespace, asset in assets.items():
+                if not isinstance(namespace, str) or not isinstance(asset, dict):
+                    continue
+                parent_asset_id = asset.get("parent_asset_id")
+                if isinstance(parent_asset_id, str) and parent_asset_id:
+                    derived_assets_by_parent.setdefault(
+                        parent_asset_id, set()
+                    ).add(namespace)
     ordered_shots = _ordered_shot_map(storyboard_text)
     execution_by_screenplay_shot: dict[str, list[tuple[str, str]]] = {}
     for segment_id, internal_shots in ordered_shots.items():
@@ -756,9 +774,15 @@ def _validate_visual_object_reference_coverage(
                 missing = [
                     asset_id
                     for asset_id in asset_ids
-                    if shot_label
-                    not in bindings_by_segment.get(segment_id, {}).get(
-                        asset_id, set()
+                    if not any(
+                        shot_label
+                        in bindings_by_segment.get(segment_id, {}).get(
+                            namespace, set()
+                        )
+                        for namespace in {
+                            asset_id,
+                            *derived_assets_by_parent.get(asset_id, set()),
+                        }
                     )
                 ]
                 if missing:

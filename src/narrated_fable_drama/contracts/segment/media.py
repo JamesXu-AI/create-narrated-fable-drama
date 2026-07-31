@@ -50,15 +50,20 @@ def resolve_catalog_media(
             voice = asset.get("voice")
             reference = voice.get("reference") if isinstance(voice, dict) else None
             uri = reference.get("uri") if isinstance(reference, dict) else None
+            path = reference.get("path") if isinstance(reference, dict) else None
             asset_type = "character_voice"
         else:
             audio = asset.get("audio")
             uri = audio.get("uri") if isinstance(audio, dict) else None
+            path = audio.get("path") if isinstance(audio, dict) else None
             asset_type = str(asset.get("type"))
+        if not isinstance(path, str) or not path.strip():
+            raise SegmentRuntimeError(f"{namespace} has no local audio path")
         return {
             "asset_id": namespace,
             "asset_type": asset_type,
             "uri": _require_http_uri(uri, namespace),
+            "local_path": path,
         }
     raise SegmentRuntimeError(
         f"Catalog media cannot resolve provider role {provider_role}"
@@ -104,4 +109,3 @@ def extension_quality_reset_schedule(
             "maximum_direct_extension_hops_without_quality_reset": maximum_direct_hops,
         }
     return schedule
-

@@ -102,6 +102,7 @@ ASSET_KEYS_BY_TYPE = {
         }
     ),
 }
+OPTIONAL_PROP_ASSET_KEYS = frozenset({"parent_asset_id"})
 VISUAL_KEYS = frozenset({"path", "uri"})
 ROSTER_ASSET_KEYS = frozenset({"path", "uri", "subject_count"})
 ROSTER_MEMBER_KEYS = frozenset(
@@ -628,6 +629,8 @@ def load_asset_catalog(
         expected_keys = ASSET_KEYS_BY_TYPE[asset_type]
         if asset_type == "character" and "voice" in raw:
             expected_keys = expected_keys | {"voice"}
+        if asset_type == "prop" and "parent_asset_id" in raw:
+            expected_keys = expected_keys | OPTIONAL_PROP_ASSET_KEYS
         value = _require_exact_keys(raw, expected_keys, f"asset {asset_id}")
         description = require_utf8_text(
             value["description_en"], f"asset {asset_id} description_en"
@@ -733,6 +736,19 @@ def load_asset_catalog(
         visual_paths[visual_resolved] = asset_id
         visual_uris[visual["uri"]] = asset_id
         normalized["visual"] = visual
+        if asset_type == "prop" and "parent_asset_id" in value:
+            parent_asset_id = require_utf8_text(
+                value["parent_asset_id"], f"prop {asset_id} parent_asset_id"
+            )
+            if not ASSET_ID_RE.fullmatch(parent_asset_id):
+                raise StoryVideoError(
+                    f"prop {asset_id} parent_asset_id must be a canonical asset ID."
+                )
+            if parent_asset_id == asset_id:
+                raise StoryVideoError(
+                    f"prop {asset_id} parent_asset_id may not reference itself."
+                )
+            normalized["parent_asset_id"] = parent_asset_id
         if asset_type == "costume":
             character_id = require_utf8_text(
                 value["character_id"], f"costume {asset_id} character_id"
@@ -841,7 +857,13 @@ def load_asset_catalog(
 
     for asset_id, asset in assets.items():
         asset_type = asset["type"]
-        if asset_type == "costume":
+        if asset_type == "prop" and "parent_asset_id" in asset:
+            parent = assets.get(asset["parent_asset_id"])
+            if not parent or parent.get("type") != "prop":
+                raise StoryVideoError(
+                    f"prop {asset_id} parent_asset_id must reference a current prop."
+                )
+        elif asset_type == "costume":
             owner = assets.get(asset["character_id"])
             if not owner or owner.get("type") != "character":
                 raise StoryVideoError(
@@ -874,6 +896,20 @@ def load_asset_catalog(
                 raise StoryVideoError(
                     f"sound {asset_id} owner_character_id must reference a current character."
                 )
+
+    for asset_id, asset in assets.items():
+        if asset.get("type") != "prop" or "parent_asset_id" not in asset:
+            continue
+        ancestry: set[str] = {asset_id}
+        current = asset
+        while "parent_asset_id" in current:
+            parent_asset_id = current["parent_asset_id"]
+            if parent_asset_id in ancestry:
+                raise StoryVideoError(
+                    f"prop {asset_id} parent_asset_id chain contains a cycle."
+                )
+            ancestry.add(parent_asset_id)
+            current = assets[parent_asset_id]
 
     return {
         "contract": "production-design-assets",

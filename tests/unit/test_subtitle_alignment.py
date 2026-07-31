@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
+from types import ModuleType, SimpleNamespace
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = (
     Path(__file__).resolve().parents[2]
@@ -18,6 +21,7 @@ from subtitles.subtitle_alignment import (  # noqa: E402
     align_authoritative_cues,
     caption_intervals_from_alignment,
     sha256_file,
+    transcribe_final_audio,
 )
 from subtitles.subtitle_style import (  # noqa: E402
     DEFAULT_STYLE,
@@ -56,6 +60,62 @@ def _align(
 
 
 class SubtitleAlignmentTests(unittest.TestCase):
+    def test_transcription_uses_sorted_unique_ownership_windows(self) -> None:
+        calls: list[str | None] = []
+
+        class FakeWhisperModel:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                pass
+
+            def transcribe(
+                self, media: str, **kwargs: object
+            ) -> tuple[list[SimpleNamespace], SimpleNamespace]:
+                clip = kwargs.get("clip_timestamps")
+                calls.append(str(clip) if clip is not None else None)
+                start = float(str(clip).split(",", 1)[0]) if clip else 0.0
+                word = SimpleNamespace(
+                    word="hello",
+                    start=start + 1.0,
+                    end=start + 1.4,
+                    probability=0.99,
+                )
+                return (
+                    [SimpleNamespace(words=[word])],
+                    SimpleNamespace(
+                        language="en",
+                        language_probability=0.99,
+                    ),
+                )
+
+        fake_module = ModuleType("faster_whisper")
+        fake_module.WhisperModel = FakeWhisperModel
+        with tempfile.TemporaryDirectory() as temporary:
+            media = Path(temporary) / "master.mp4"
+            media.write_bytes(b"media")
+            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                words, evidence = transcribe_final_audio(
+                    media,
+                    target_language="English",
+                    model_family="small",
+                    device="cpu",
+                    compute_type="int8",
+                    beam_size=5,
+                    vad_filter=True,
+                    ownership_windows=[
+                        (10.0, 20.0),
+                        (0.0, 5.0),
+                        (10.0, 20.0),
+                    ],
+                )
+
+        self.assertEqual(calls, ["0.000000,5.000000", "10.000000,20.000000"])
+        self.assertEqual([word.start_seconds for word in words], [1.0, 11.0])
+        self.assertEqual(
+            evidence["alignment_scope"],
+            "dialogue_segment_ownership_windows",
+        )
+        self.assertEqual(evidence["ownership_window_count"], 2)
+
     def test_alignment_cannot_steal_an_exact_word_from_the_next_segment(
         self,
     ) -> None:

@@ -232,6 +232,55 @@ class StoryObjectAuthorityTests(unittest.TestCase):
                         _storyboard("different-asset"),
                     )
 
+    def test_storyboard_accepts_cataloged_state_derivative_binding(self) -> None:
+        screenplay = {
+            "story_objects": [
+                _story_object(
+                    owner_kind="independent",
+                    triggers=["state_change"],
+                    authority_shots=["A-001"],
+                )
+            ]
+        }
+        plan = {
+            "object_authorities": [
+                {
+                    "object_id": "object-001",
+                    "mode": "dedicated_asset",
+                    "asset_ids": ["prop-controlled"],
+                }
+            ]
+        }
+        catalog = {
+            "assets": {
+                "prop-controlled-repaired": {
+                    "type": "prop",
+                    "parent_asset_id": "prop-controlled",
+                }
+            }
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            task_dir = Path(temporary) / "workspace" / "tasks" / "task"
+            plan_path = (
+                task_dir
+                / "direct-production-design"
+                / "production-design-plan.json"
+            )
+            plan_path.parent.mkdir(parents=True)
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            catalog_path = task_dir.parent.parent / "assets" / "assets.json"
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+            with patch.object(
+                storyboard_validation,
+                "load_screenplay_file",
+                return_value=screenplay,
+            ):
+                storyboard_validation._validate_visual_object_reference_coverage(
+                    task_dir,
+                    _storyboard("prop-controlled-repaired"),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

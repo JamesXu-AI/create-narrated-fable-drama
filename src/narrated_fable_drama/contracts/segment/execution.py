@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 from typing import Any
+import wave
 
 from narrated_fable_drama.contracts.segment.common import (
     CAPABILITY_PROFILE_RELATIVE,
@@ -26,6 +28,66 @@ from narrated_fable_drama.contracts.segment.storyboard import (
 )
 from narrated_fable_drama.contracts.storyboard import STORYBOARD_RELATIVE
 from narrated_fable_drama.core.project_context import load_project_context
+
+
+REFERENCE_AUDIO_SAFETY_MARGIN_SECONDS = 0.2
+
+
+def audio_reference_duration_policy(
+    source_durations: list[float], maximum_total_seconds: float
+) -> list[float]:
+    """Return provider durations that safely fit the model's aggregate limit."""
+
+    if (
+        not source_durations
+        or isinstance(maximum_total_seconds, bool)
+        or maximum_total_seconds <= REFERENCE_AUDIO_SAFETY_MARGIN_SECONDS
+        or any(duration <= 0 for duration in source_durations)
+    ):
+        raise SegmentRuntimeError("Invalid reference-audio duration capability")
+    if sum(source_durations) <= maximum_total_seconds:
+        return source_durations
+    usable = maximum_total_seconds - REFERENCE_AUDIO_SAFETY_MARGIN_SECONDS
+    per_reference = math.floor(usable / len(source_durations) * 1000.0) / 1000.0
+    if per_reference <= 0:
+        raise SegmentRuntimeError("Reference-audio aggregate limit is too small")
+    return [min(duration, per_reference) for duration in source_durations]
+
+
+def _wav_duration_seconds(path: Path) -> float:
+    try:
+        with wave.open(str(path), "rb") as source:
+            return source.getnframes() / float(source.getframerate())
+    except (OSError, EOFError, wave.Error, ZeroDivisionError) as exc:
+        raise SegmentRuntimeError(f"Cannot probe reference audio: {path}") from exc
+
+
+def provider_identity_roles(
+    states: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+    """Split character states into submitted and internal-only identity roles.
+
+    A character can remain physically present in story continuity while every
+    authored shot deliberately keeps that character outside the crop. Sending
+    that character's positive identity image makes the image model render them
+    despite the negative prompt. Only roles with at least one required visible
+    shot therefore receive positive identity media.
+    """
+
+    submitted: list[str] = []
+    internal_only: list[str] = []
+    for item in states:
+        asset_id = item["character_asset_id"]
+        required_visible_shots = item.get("required_visible_shots")
+        if (
+            item.get("segment_presence_rule") != "remain_absent"
+            and isinstance(required_visible_shots, list)
+            and required_visible_shots
+        ):
+            submitted.append(asset_id)
+        else:
+            internal_only.append(asset_id)
+    return submitted, internal_only
 
 
 def _source_attempt(task_dir: Path, source_segment_id: str) -> str:
@@ -167,20 +229,57 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
         limit = limits[role]
         if isinstance(limit, bool) or not isinstance(limit, int) or count > limit:
             raise SegmentRuntimeError(f"{segment_id} exceeds verified {role} limit")
+    audio_media = [
+        item for item in media_bindings
+        if item.get("provider_role") == "reference_audio"
+        and item.get("source_kind") == "asset_catalog"
+    ]
+    maximum_audio_seconds = capabilities.get(
+        "maximum_reference_audio_total_seconds"
+    )
+    audio_duration_policy = {
+        "maximum_total_seconds": maximum_audio_seconds,
+        "source_total_seconds": 0.0,
+        "provider_total_seconds": 0.0,
+        "trimmed": False,
+    }
+    if audio_media:
+        if (
+            isinstance(maximum_audio_seconds, bool)
+            or not isinstance(maximum_audio_seconds, (int, float))
+            or maximum_audio_seconds <= 0
+        ):
+            raise SegmentRuntimeError(
+                "Seedance capability profile lacks reference-audio duration limit"
+            )
+        source_durations = [
+            _wav_duration_seconds(REPOSITORY_ROOT / item["local_path"])
+            for item in audio_media
+        ]
+        provider_durations = audio_reference_duration_policy(
+            source_durations, float(maximum_audio_seconds)
+        )
+        for item, source_duration, provider_duration in zip(
+            audio_media, source_durations, provider_durations, strict=True
+        ):
+            item["source_duration_seconds"] = round(source_duration, 6)
+            item["provider_duration_seconds"] = round(provider_duration, 6)
+        audio_duration_policy = {
+            "maximum_total_seconds": float(maximum_audio_seconds),
+            "source_total_seconds": round(sum(source_durations), 6),
+            "provider_total_seconds": round(sum(provider_durations), 6),
+            "trimmed": any(
+                provider + 0.001 < source
+                for source, provider in zip(
+                    source_durations, provider_durations, strict=True
+                )
+            ),
+        }
     assets = catalog.get("assets")
     if not isinstance(assets, dict):
         raise SegmentRuntimeError("Asset catalog has no assets object")
     states = row["continuity"]["character_segment_states"]
-    renderable = [
-        item["character_asset_id"]
-        for item in states
-        if item["segment_presence_rule"] != "remain_absent"
-    ]
-    absent = [
-        item["character_asset_id"]
-        for item in states
-        if item["segment_presence_rule"] == "remain_absent"
-    ]
+    renderable, non_submission = provider_identity_roles(states)
     bound_images = {
         str(item.get("namespace"))
         for item in media_bindings
@@ -217,15 +316,15 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
         raise SegmentRuntimeError(
             f"{segment_id} lacks identity image bindings for visible/present roles: {missing}"
         )
-    wrongly_bound_absent = [
+    wrongly_bound_internal = [
         performer
-        for performer in absent
+        for performer in non_submission
         if any(covers(namespace, performer) for namespace in bound_images)
     ]
-    if wrongly_bound_absent:
+    if wrongly_bound_internal:
         raise SegmentRuntimeError(
-            f"{segment_id} submits positive images for visually absent roles: "
-            f"{wrongly_bound_absent}"
+            f"{segment_id} submits positive images for roles with no required "
+            f"visible shots: {wrongly_bound_internal}"
         )
     result = {
         "contract": "seedance-storyboard-derived-execution-plan-v1",
@@ -273,8 +372,9 @@ def load_execution_plan(task_dir: Path, segment_id: str) -> dict[str, Any]:
         },
         "media_bindings": media_bindings,
         "media_counts": counts,
+        "reference_audio_duration_policy": audio_duration_policy,
         "identity_reference_coverage": identity_coverage,
-        "identity_non_submission_roles": absent,
+        "identity_non_submission_roles": non_submission,
         "dialogue_cues": row["dialogue_cues"],
         "final_visible_state": row["final_visible_state"],
         "final_sound_state": row["final_sound_state"],

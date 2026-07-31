@@ -35,6 +35,9 @@ def refresh(task_dir: Path) -> dict[str, Any]:
             "maximum_reference_images": seedance.MAX_REFERENCE_IMAGES,
             "maximum_reference_videos": seedance.MAX_REFERENCE_VIDEOS,
             "maximum_reference_audios": seedance.MAX_REFERENCE_AUDIOS,
+            "maximum_reference_audio_total_seconds": (
+                seedance.MAX_REFERENCE_AUDIO_TOTAL_SECONDS
+            ),
             "supported_resolutions": ["480p", "720p", "1080p", "4k"],
             "recommended_total_reference_minimum": 4,
             "recommended_total_reference_maximum": 5,

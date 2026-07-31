@@ -210,17 +210,35 @@ def discover_segments(
             raise TimelineError(f"{segment_name} production attempt identity is stale")
         parsed_script = parse_segment_script(script)
         execution_plan = load_execution_plan(task_dir, segment_name)
-        if not allow_stale_preview and (
-            production_record.get("segment_prompt_sha256")
-            != parsed_script["script_sha256"]
-            or production_record.get("seedance_execution_plan_sha256")
-            != sha256_json(execution_plan)
-            or production_record.get("operation")
-            != parsed_script["metadata"]["operation"]
-        ):
-            raise TimelineError(
-                f"{segment_name} production record differs from its Seed Master Script"
+        if not allow_stale_preview:
+            prompt_hash_matches = (
+                production_record.get("segment_prompt_sha256")
+                == parsed_script["script_sha256"]
             )
+            operation_matches = (
+                production_record.get("operation")
+                == parsed_script["metadata"]["operation"]
+            )
+            execution_plan_matches = (
+                production_record.get("seedance_execution_plan_sha256")
+                == sha256_json(execution_plan)
+            )
+            # A Storyboard-wide source digest can change when an unrelated
+            # Segment is revised. Finishing may keep an already reviewed clip
+            # only when its exact submitted prompt and operation are unchanged;
+            # any prompt drift still blocks the final timeline.
+            submitted_prompt_matches = (
+                production_record.get("submitted_prompt")
+                == parsed_script["prompt"]
+            )
+            if (
+                not prompt_hash_matches
+                or not operation_matches
+                or (not execution_plan_matches and not submitted_prompt_matches)
+            ):
+                raise TimelineError(
+                    f"{segment_name} production record differs from its Seed Master Script"
+                )
         fields = parsed_script["metadata"]
         probe = probe_media(video)
         if not probe.has_audio:

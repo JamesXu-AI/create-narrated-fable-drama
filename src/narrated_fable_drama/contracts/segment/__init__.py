@@ -12,7 +12,9 @@ from narrated_fable_drama.contracts.segment.common import (
     write_json,
 )
 from narrated_fable_drama.contracts.segment.execution import (
+    audio_reference_duration_policy,
     load_execution_plan,
+    provider_identity_roles,
     validate_source_identity,
 )
 from narrated_fable_drama.contracts.segment.media import (
@@ -30,8 +32,10 @@ __all__ = [
     "WHITE_MODEL_RESET_CONTRACT_RELATIVE",
     "SegmentRuntimeError",
     "extension_quality_reset_schedule",
+    "audio_reference_duration_policy",
     "load_execution_plan",
     "parse_segment_script",
+    "provider_identity_roles",
     "read_json",
     "resolve_catalog_media",
     "sha256_file",

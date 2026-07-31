@@ -98,6 +98,7 @@ def transcribe_final_audio(
     compute_type: str,
     beam_size: int,
     vad_filter: bool,
+    ownership_windows: list[tuple[float, float]] | None = None,
 ) -> tuple[list[TimedWord], dict[str, Any]]:
     """Return real final-timeline word timestamps from the clean master."""
 
@@ -112,38 +113,71 @@ def transcribe_final_audio(
             "faster-whisper is required for final-audio subtitle alignment."
         ) from exc
     model_name = _model_name(model_family, target_language)
+    normalized_windows: list[tuple[float, float]] = []
+    for start, end in sorted(set(ownership_windows or [])):
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, (int, float))
+            or not isinstance(end, (int, float))
+            or start < 0
+            or end <= start
+        ):
+            raise SubtitleBuildError(
+                "Subtitle alignment received an invalid ownership window."
+            )
+        normalized_windows.append((float(start), float(end)))
     try:
         model = WhisperModel(
             model_name,
             device=device,
             compute_type=compute_type,
         )
-        segments, info = model.transcribe(
-            str(media_path),
-            language=_language_code(target_language),
-            beam_size=beam_size,
-            word_timestamps=True,
-            vad_filter=vad_filter,
-            condition_on_previous_text=False,
+        words: list[TimedWord] = []
+        info: Any = None
+        transcription_windows: list[tuple[float, float] | None] = (
+            list(normalized_windows) if normalized_windows else [None]
         )
-        words = [
-            TimedWord(
-                text=str(word.word).strip(),
-                start_seconds=float(word.start),
-                end_seconds=float(word.end),
-                probability=float(word.probability),
-            )
-            for segment in segments
-            for word in (segment.words or [])
-            if str(word.word).strip()
-            and word.start is not None
-            and word.end is not None
-        ]
+        for ownership_window in transcription_windows:
+            options: dict[str, Any] = {
+                "language": _language_code(target_language),
+                "beam_size": beam_size,
+                "word_timestamps": True,
+                "vad_filter": vad_filter,
+                "condition_on_previous_text": False,
+            }
+            if ownership_window is not None:
+                start, end = ownership_window
+                options["clip_timestamps"] = f"{start:.6f},{end:.6f}"
+            segments, info = model.transcribe(str(media_path), **options)
+            for segment in segments:
+                for word in segment.words or []:
+                    if (
+                        not str(word.word).strip()
+                        or word.start is None
+                        or word.end is None
+                    ):
+                        continue
+                    start_seconds = float(word.start)
+                    end_seconds = float(word.end)
+                    if ownership_window is not None and (
+                        end_seconds < ownership_window[0] - 0.05
+                        or start_seconds > ownership_window[1] + 0.05
+                    ):
+                        continue
+                    words.append(
+                        TimedWord(
+                            text=str(word.word).strip(),
+                            start_seconds=start_seconds,
+                            end_seconds=end_seconds,
+                            probability=float(word.probability),
+                        )
+                    )
     except Exception as exc:
         raise SubtitleBuildError(
             f"Final-audio subtitle alignment failed with model {model_name}."
         ) from exc
-    if not words:
+    if not words or info is None:
         raise SubtitleBuildError("Final-audio subtitle alignment produced no words.")
     return words, {
         "model": model_name,
@@ -156,6 +190,12 @@ def transcribe_final_audio(
             float(info.language_probability),
             6,
         ),
+        "alignment_scope": (
+            "dialogue_segment_ownership_windows"
+            if normalized_windows
+            else "complete_final_audio"
+        ),
+        "ownership_window_count": len(normalized_windows),
         "source_path": str(media_path.resolve()),
         "source_sha256": sha256_file(media_path),
     }

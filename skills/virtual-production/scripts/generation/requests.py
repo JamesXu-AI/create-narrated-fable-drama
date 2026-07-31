@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 from typing import Any
 
 from narrated_fable_drama.contracts.segment import (
     SCRIPT_DIR_RELATIVE,
     load_execution_plan,
     parse_segment_script as parse_local_segment_prompt,
+    sha256_file,
     sha256_json,
     storyboard_segment_rows,
     token_sort_key,
@@ -27,6 +29,71 @@ from .reset import (
     ensure_white_model_predecessor,
 )
 from validate_segment_scripts import validate_task as validate_segment_scripts
+
+
+def _provider_audio_url(
+    reference: dict[str, Any], *, task_dir: Path
+) -> str:
+    source_duration = reference.get("source_duration_seconds")
+    provider_duration = reference.get("provider_duration_seconds")
+    if (
+        not isinstance(source_duration, (int, float))
+        or not isinstance(provider_duration, (int, float))
+        or source_duration <= 0
+        or provider_duration <= 0
+    ):
+        raise SegmentGenerationError("Reference audio lacks duration policy")
+    if provider_duration + 0.001 >= source_duration:
+        return str(reference["uri"])
+
+    repository_root = task_dir.parents[2]
+    source = (repository_root / str(reference.get("local_path") or "")).resolve()
+    try:
+        source.relative_to(repository_root)
+    except ValueError as exc:
+        raise SegmentGenerationError(
+            "Reference audio resolves outside the repository"
+        ) from exc
+    if not source.is_file():
+        raise SegmentGenerationError(f"Missing reference audio: {source}")
+    output_root = (
+        task_dir / PENDING_DIRNAME / DEPARTMENT_DIRNAME / "reference-audio"
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    duration_ms = int(round(float(provider_duration) * 1000.0))
+    output = output_root / (
+        f"{reference['asset_id']}-{duration_ms}ms-{sha256_file(source)[:12]}.wav"
+    )
+    if not output.is_file():
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-i",
+                str(source),
+                "-t",
+                f"{provider_duration:.3f}",
+                "-ac",
+                "1",
+                "-ar",
+                "44100",
+                "-c:a",
+                "pcm_s16le",
+                str(output),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0 or not output.is_file():
+            raise SegmentGenerationError(
+                f"Cannot prepare bounded reference audio: {result.stderr.strip()}"
+            )
+    return provider_runtime.tos_upload_path(
+        output, kind="inputs/reference-audio"
+    )["public_url"]
 
 
 def parse_segment_script(path: Path, *, task_dir: Path | None = None) -> dict[str, Any]:
@@ -159,11 +226,14 @@ def _runtime_reference_media_content(
         if source_kind == "provider_last_frame":
             source = source_dir / "last-frame.png"
             provider_type = "image_url"
-            url = source_record.get("last_frame_source_url")
+            # Provider result URLs can be readable by the local downloader yet
+            # return 403 when Seedance tries to fetch them for a successor.
+            # Re-upload the accepted local evidence to our public input bucket.
+            url = None
         elif source_kind == "complete_predecessor_video":
             source = source_dir / "video.mp4"
             provider_type = "video_url"
-            url = source_record.get("video_source_url")
+            url = None
         elif source_kind == "white_model_predecessor_video":
             source = ensure_white_model_predecessor(
                 segment,
@@ -232,7 +302,9 @@ def request_payload(
     media_content.extend(
         {
             "type": "audio_url",
-            "audio_url": {"url": reference["uri"]},
+            "audio_url": {
+                "url": _provider_audio_url(reference, task_dir=task_dir)
+            },
             "role": "reference_audio",
             "_provider_token": reference["provider_token"],
         }
