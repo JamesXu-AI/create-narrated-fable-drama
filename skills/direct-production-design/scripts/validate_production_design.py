@@ -29,6 +29,27 @@ class ProductionDesignError(RuntimeError):
     pass
 
 
+def _current_speaker_voice_count(
+    plan: dict[str, object], voice_result: dict[str, object]
+) -> int:
+    """Count current speakers without treating reusable catalog voices as cast."""
+    expected_ids = {
+        character["entity_id"]
+        for character in plan["characters"]
+        if character["speaks"]
+    }
+    validated_ids = {
+        speaker["asset_id"] for speaker in voice_result["speakers"]
+    }
+    missing_ids = expected_ids - validated_ids
+    if missing_ids:
+        raise ProductionDesignError(
+            "Voice assets must cover every speaking Kind=individual entity; "
+            f"missing={sorted(missing_ids)}"
+        )
+    return len(expected_ids)
+
+
 def _validate_silent_group_authority(
     plan: dict[str, object], catalog: dict[str, object]
 ) -> int:
@@ -117,15 +138,7 @@ def validate_task(task_dir: Path) -> dict[str, object]:
             f"expected={sorted(expected_scene_ids)}, actual={sorted(planned_scene_ids)}"
         )
     voice_result = validate_voice_authority(task_dir)
-    expected_speaker_count = sum(
-        1 for character in plan["characters"] if character["speaks"]
-    )
-    if voice_result["speaker_count"] != expected_speaker_count:
-        raise ProductionDesignError(
-            "Voice assets must exactly cover speaking Kind=individual entities; "
-            f"expected={expected_speaker_count}, "
-            f"actual={voice_result['speaker_count']}"
-        )
+    current_speaker_voice_count = _current_speaker_voice_count(plan, voice_result)
     return {
         "status": "PASS",
         "asset_count": len(catalog["assets"]),
@@ -137,7 +150,7 @@ def validate_task(task_dir: Path) -> dict[str, object]:
             for item in plan["object_authorities"]
         ),
         "prop_asset_count": len(plan["props"]),
-        "speaker_voice_count": voice_result["speaker_count"],
+        "speaker_voice_count": current_speaker_voice_count,
         "location_master_count": len(plan["locations"]),
         "aesthetic_reference_frame_count": (
             aesthetic_reference["reference_count"]

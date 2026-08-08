@@ -67,7 +67,10 @@ def _load_resumable_attempt(
         compact_record = read_json(compact_record_path)
         if (
             compact_record.get("status") == "GENERATED"
-            and compact_record.get("request_sha256") == sha256_json(request)
+            and compact_record.get("segment_prompt_sha256")
+            == segment["script_sha256"]
+            and compact_record.get("seedance_execution_plan_sha256")
+            == segment["execution_plan_sha256"]
             and (active_dir / "video.mp4").is_file()
             and (active_dir / "last-frame.png").is_file()
         ):
@@ -85,9 +88,11 @@ def _load_resumable_attempt(
     submission = read_json(submission_path)
     if submission.get("generation_task_id") != segment["generation_task_id"]:
         raise SegmentGenerationError("Active provider task belongs to another Segment.")
+    # Provider-uploaded media URLs can be regenerated between processes even
+    # though the creative authority is unchanged. Resume the already-submitted
+    # provider task when the prompt and execution-plan hashes still match.
     if (
-        submission.get("request_sha256") != sha256_json(request)
-        or submission.get("segment_prompt_sha256") != segment["script_sha256"]
+        submission.get("segment_prompt_sha256") != segment["script_sha256"]
         or submission.get("seedance_execution_plan_sha256")
         != segment["execution_plan_sha256"]
     ):

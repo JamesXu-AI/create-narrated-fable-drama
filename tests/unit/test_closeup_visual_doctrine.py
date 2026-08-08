@@ -152,6 +152,12 @@ class CloseupVisualDoctrineTests(unittest.TestCase):
             [6.0, 6.0],
         )
 
+    def test_short_voice_reference_is_padded_to_provider_minimum(self) -> None:
+        self.assertEqual(
+            audio_reference_duration_policy([1.771167], 15.2),
+            [1.8],
+        )
+
     def test_off_crop_present_role_is_not_submitted_as_positive_identity(self) -> None:
         submitted, internal_only = provider_identity_roles(
             [

@@ -43,7 +43,7 @@ def _provider_audio_url(
         or provider_duration <= 0
     ):
         raise SegmentGenerationError("Reference audio lacks duration policy")
-    if provider_duration + 0.001 >= source_duration:
+    if abs(provider_duration - source_duration) <= 0.001:
         return str(reference["uri"])
 
     repository_root = task_dir.parents[2]
@@ -65,6 +65,11 @@ def _provider_audio_url(
         f"{reference['asset_id']}-{duration_ms}ms-{sha256_file(source)[:12]}.wav"
     )
     if not output.is_file():
+        audio_filter_args = (
+            ["-af", "apad"]
+            if provider_duration > source_duration
+            else []
+        )
         result = subprocess.run(
             [
                 "ffmpeg",
@@ -73,6 +78,7 @@ def _provider_audio_url(
                 "error",
                 "-i",
                 str(source),
+                *audio_filter_args,
                 "-t",
                 f"{provider_duration:.3f}",
                 "-ac",

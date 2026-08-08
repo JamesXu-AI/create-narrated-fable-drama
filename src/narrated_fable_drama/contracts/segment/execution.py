@@ -31,12 +31,13 @@ from narrated_fable_drama.core.project_context import load_project_context
 
 
 REFERENCE_AUDIO_SAFETY_MARGIN_SECONDS = 0.2
+REFERENCE_AUDIO_MINIMUM_SECONDS = 1.8
 
 
 def audio_reference_duration_policy(
     source_durations: list[float], maximum_total_seconds: float
 ) -> list[float]:
-    """Return provider durations that safely fit the model's aggregate limit."""
+    """Return provider durations that fit the model's per-file and total limits."""
 
     if (
         not source_durations
@@ -45,13 +46,17 @@ def audio_reference_duration_policy(
         or any(duration <= 0 for duration in source_durations)
     ):
         raise SegmentRuntimeError("Invalid reference-audio duration capability")
-    if sum(source_durations) <= maximum_total_seconds:
-        return source_durations
+    provider_durations = [
+        max(duration, REFERENCE_AUDIO_MINIMUM_SECONDS)
+        for duration in source_durations
+    ]
+    if sum(provider_durations) <= maximum_total_seconds:
+        return provider_durations
     usable = maximum_total_seconds - REFERENCE_AUDIO_SAFETY_MARGIN_SECONDS
     per_reference = math.floor(usable / len(source_durations) * 1000.0) / 1000.0
-    if per_reference <= 0:
+    if per_reference < REFERENCE_AUDIO_MINIMUM_SECONDS:
         raise SegmentRuntimeError("Reference-audio aggregate limit is too small")
-    return [min(duration, per_reference) for duration in source_durations]
+    return [min(duration, per_reference) for duration in provider_durations]
 
 
 def _wav_duration_seconds(path: Path) -> float:

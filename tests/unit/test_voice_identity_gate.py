@@ -134,6 +134,39 @@ class VoiceIdentityGateTests(unittest.TestCase):
             comparison["failure_reasons"][0],
         )
 
+    def test_moderate_spectral_centroid_difference_is_allowed(self) -> None:
+        reference = {
+            "median_pitch_hz": 150.0,
+            "median_spectral_centroid_hz": 500.0,
+            "mean_log_mel_spectral_envelope": [
+                float(index) for index in range(26)
+            ],
+        }
+        candidate = dict(reference)
+        candidate["median_spectral_centroid_hz"] = 240.0
+        comparison = compare_profiles(
+            reference,
+            candidate,
+            config=self.config,
+        )
+        self.assertEqual(
+            self.config["maximum_spectral_centroid_ratio"],
+            2.25,
+        )
+        self.assertEqual(comparison["status"], "PASS")
+
+        candidate["median_spectral_centroid_hz"] = 200.0
+        comparison = compare_profiles(
+            reference,
+            candidate,
+            config=self.config,
+        )
+        self.assertEqual(comparison["status"], "FAIL")
+        self.assertIn(
+            "spectral_centroid_ratio exceeds",
+            comparison["failure_reasons"][0],
+        )
+
     def test_recorded_failure_blocks_successor_but_legacy_record_remains_readable(
         self,
     ) -> None:
